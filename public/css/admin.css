@@ -1,0 +1,264 @@
+/* ═══════════════════════════════════════════════════════
+   TickGas — admin.css
+   App shell layout + admin-only component styles.
+   All shared components (cards, buttons, tables…) → main.css
+   ═══════════════════════════════════════════════════════ */
+
+/* ── App shell ───────────────────────────────────────── */
+body { overflow-x: hidden; }
+
+.container {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ── Sidebar ─────────────────────────────────────────── */
+.sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  background: var(--bg1);
+  border-right: 1px solid var(--border);
+  padding: 20px 12px 20px;
+  position: fixed;
+  top: 0; left: 0;
+  height: 100vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 200;
+}
+
+.logo {
+  display: block;
+  font-size: 20px;
+  font-weight: 800;
+  background: var(--gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  padding: 4px 10px 16px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ── Sidebar profile card ─────────────────────────────── */
+.sidebar-profile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: background .15s;
+  margin-bottom: 2px;
+}
+.sidebar-profile:hover { background: var(--bg2); }
+
+.sidebar-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--gradient);
+  color: #000;
+  font-weight: 800;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sidebar-profile-info { flex: 1; overflow: hidden; }
+.sidebar-profile-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sidebar-profile-role { font-size: 11px; color: var(--text2); margin-top: 1px; }
+.sidebar-profile-chevron { font-size: 16px; color: var(--text2); flex-shrink: 0; }
+
+.sidebar-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 6px 2px 8px;
+  flex-shrink: 0;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  border-radius: var(--r-sm);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text2);
+  cursor: pointer;
+  user-select: none;
+  transition: background .15s, color .15s;
+  text-decoration: none;
+}
+.nav-item:hover  { background: var(--bg2); color: var(--text1); }
+.nav-item.active {
+  background: var(--gradient);
+  color: #000;
+  font-weight: 700;
+}
+
+/* ── Main content area ───────────────────────────────── */
+.main {
+  flex: 1;
+  margin-left: 240px;
+  min-height: 100vh;
+  padding: 32px 36px;
+  overflow-y: auto;
+}
+
+/* ── Page header ─────────────────────────────────────── */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 28px;
+}
+.header h1 { font-size: 24px; font-weight: 700; }
+.header h2 { font-size: 20px; font-weight: 700; }
+.date { font-size: 13px; color: var(--text2); margin-top: 4px; }
+.header-controls { display: flex; gap: 10px; align-items: center; flex-shrink: 0; }
+
+/* ── Hamburger button (hidden on desktop) ────────────── */
+.hamburger-btn {
+  display: none;
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  z-index: 300;
+  width: 42px;
+  height: 42px;
+  background: var(--bg1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0;
+  transition: border-color .2s;
+}
+.hamburger-btn:hover { border-color: var(--accent); }
+.hamburger-btn span {
+  display: block;
+  width: 20px;
+  height: 2px;
+  background: var(--text1);
+  border-radius: 2px;
+  transition: background .2s;
+}
+.hamburger-btn:hover span { background: var(--accent); }
+.hamburger-btn.hidden { display: none !important; }
+
+/* ── Sidebar overlay backdrop (mobile) ───────────────── */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  z-index: 190;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+.sidebar-overlay.active { display: block; }
+
+/* ── Close button inside sidebar (mobile only) ───────── */
+.sidebar-close-btn {
+  display: none;
+  position: absolute;
+  top: 14px;
+  right: 12px;
+  width: 28px;
+  height: 28px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  color: var(--text2);
+  font-size: 14px;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  transition: border-color .15s, color .15s;
+  z-index: 1;
+}
+.sidebar-close-btn:hover { border-color: var(--error); color: var(--error); }
+
+/* ── Responsive ──────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .stats-grid, .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .charts-row, .charts-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 900px) {
+  /* Sidebar slides off-screen; hamburger button appears */
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform .28s cubic-bezier(.4,0,.2,1);
+    box-shadow: none;
+    position: fixed;
+    z-index: 200;
+  }
+  .sidebar.open {
+    transform: translateX(0);
+    box-shadow: 6px 0 28px rgba(0,0,0,.6);
+  }
+
+  /* Show hamburger, hide close-btn by default; flip when open */
+  .hamburger-btn { display: flex; }
+  .sidebar-close-btn { display: flex; }
+
+  .main {
+    margin-left: 0;
+    padding: 20px 16px;
+    /* Push content down so hamburger doesn't overlap the header */
+    padding-top: 70px;
+  }
+
+  .settings-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 600px) {
+  .stats-grid, .stats-row, .kpi-grid { grid-template-columns: 1fr 1fr; }
+  .summary-cards, .earnings-summary  { grid-template-columns: 1fr; }
+  .form-row, .row { grid-template-columns: 1fr; }
+  .filters { flex-direction: column; }
+  .filter-select, .search-box, .date-input { min-width: unset; width: 100%; }
+  .main { padding: 14px; padding-top: 70px; }
+  .header { flex-wrap: wrap; gap: 12px; }
+}
+
+/* ── Sidebar install button ──────────────────────────── */
+.sidebar-install-btn {
+  display: none; /* shown via JS when installable */
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  background: rgba(255, 107, 53, 0.08);
+  border: 1px solid rgba(255, 107, 53, 0.25);
+  border-radius: var(--r-sm);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background .15s, border-color .15s;
+  margin-top: 4px;
+  text-align: left;
+}
+.sidebar-install-btn:hover {
+  background: rgba(255, 107, 53, 0.15);
+  border-color: rgba(255, 107, 53, 0.45);
+}

@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Locations — TickGas Admin</title>
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="/css/admin.css">
+    <link rel="icon" type="image/png" href="/icons/favicon.png">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0a0a0a">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <script src="/js/api.js"></script>
+    <script src="/js/sidebar.js"></script>
+    <style>
+        .summary-cards { display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:28px; }
+        .summary-card  { background:var(--bg1);border:1px solid var(--border);border-radius:16px;padding:18px 20px; }
+        .summary-card .label { font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px; }
+        .summary-card .value { font-size:24px;font-weight:800;font-family:var(--mono); }
+        .coord-text { font-family:var(--mono);font-size:12px;color:var(--text2); }
+
+        @media (max-width:600px) { .summary-cards { grid-template-columns:1fr 1fr; } }
+    </style>
+</head>
+<body>
+    <script>if (!requireAuth()) throw new Error('redirect');</script>
+    <script>renderSidebar('locations');</script>
+    <div class="container">
+
+        <div class="main">
+            <div class="header">
+                <h1>Service Locations</h1>
+                <div class="header-controls">
+                    <button class="refresh-btn" onclick="resetAndLoad()">↻ Refresh</button>
+                    <button class="btn-primary" onclick="openCreateModal()" style="margin-left:12px;">+ Add Location</button>
+                </div>
+            </div>
+
+            <div class="summary-cards">
+                <div class="summary-card"><div class="label">Total</div><div class="value" id="sTotal">—</div></div>
+                <div class="summary-card"><div class="label">Active</div><div class="value" id="sActive" style="color:var(--success)">—</div></div>
+                <div class="summary-card"><div class="label">Inactive</div><div class="value" id="sInactive" style="color:var(--text2)">—</div></div>
+            </div>
+
+            <div class="filters">
+                <select class="filter-select" id="activeFilter" onchange="resetAndLoad()">
+                    <option value="">All</option>
+                    <option value="true">Active Only</option>
+                    <option value="false">Inactive Only</option>
+                </select>
+                <input type="text" class="search-box" id="searchInput" placeholder="Search by name or area…" oninput="resetAndLoad()">
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Area</th>
+                            <th>Coordinates</th>
+                            <th>Status</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                        <tr><td colspan="6" class="loading"><div class="loading-spinner"></div>Loading…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="pagination" id="pagination"></div>
+        </div>
+    </div>
+
+    <!-- ── CREATE / EDIT MODAL ──────────────────────────────────── -->
+    <div class="modal" id="locationModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Add Location</h2>
+                <button class="close-btn" onclick="closeModal()">×</button>
+            </div>
+
+            <div id="modalAlert"   style="display:none;margin-bottom:16px;padding:10px 14px;border-radius:8px;background:rgba(255,68,68,.08);border:1px solid rgba(255,68,68,.25);color:var(--error);font-size:13px;"></div>
+            <div id="modalSuccess" style="display:none;margin-bottom:16px;padding:10px 14px;border-radius:8px;background:rgba(0,232,122,.08);border:1px solid rgba(0,232,122,.25);color:var(--success);font-size:13px;"></div>
+
+            <input type="hidden" id="f_id">
+
+            <form autocomplete="off" onsubmit="event.preventDefault(); saveLocation();">
+            <div class="form-group">
+                <label>Location Name *</label>
+                <input type="text" id="f_name" placeholder="e.g. Westlands" maxlength="100" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label>Area / Description *</label>
+                <input type="text" id="f_area" placeholder="e.g. Westlands, Nairobi — near Sarit Centre" maxlength="200" autocomplete="off">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Latitude</label>
+                    <input type="number" step="0.000001" id="f_lat" placeholder="-1.267500" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label>Longitude</label>
+                    <input type="number" step="0.000001" id="f_lng" placeholder="36.803600" autocomplete="off">
+                </div>
+            </div>
+            <div class="checkbox-group" style="margin-bottom:6px;">
+                <label class="checkbox-item">
+                    <input type="checkbox" id="f_active" checked>
+                    Active (visible to customers)
+                </label>
+            </div>
+            <div class="modal-actions">
+                <button type="submit" class="btn-primary" id="saveBtn" style="flex:1;">Save Location</button>
+                <button type="button" class="btn-secondary" onclick="closeModal()" style="flex:1;">Cancel</button>
+            </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ── DELETE CONFIRM ───────────────────────────────────────── -->
+    <div class="modal" id="deleteModal">
+        <div class="modal-content" style="max-width:420px;">
+            <div class="modal-header">
+                <h2>Deactivate Location</h2>
+                <button class="close-btn" onclick="closeDeleteModal()">×</button>
+            </div>
+            <p style="color:var(--text2);margin:16px 0;font-size:14px;line-height:1.6;">
+                Deactivate <strong id="deleteLocationName"></strong>? It will be hidden from customers but preserved in the database.
+            </p>
+            <div class="modal-actions">
+                <button class="btn-primary" id="confirmDeleteBtn" style="flex:1;background:var(--error);" onclick="confirmDelete()">Deactivate</button>
+                <button class="btn-secondary" onclick="closeDeleteModal()" style="flex:1;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+    let currentPage = 1;
+    const PAGE_SIZE  = 20;
+    let deleteId     = null;
+    let isEditing    = false;
+
+    // ── Utilities ─────────────────────────────────────────────────────────────
+    function esc(s) {
+        return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function toast(msg, type = 'success') {
+        const el = document.getElementById('toast');
+        el.textContent = msg; el.className = `toast ${type}`; el.classList.add('show');
+        setTimeout(() => el.classList.remove('show'), 3000);
+    }
+    function modalAlert(msg) {
+        const el = document.getElementById('modalAlert');
+        el.textContent = msg; el.style.display = 'block';
+        document.getElementById('modalSuccess').style.display = 'none';
+    }
+    function modalOk(msg) {
+        const el = document.getElementById('modalSuccess');
+        el.textContent = msg; el.style.display = 'block';
+        document.getElementById('modalAlert').style.display = 'none';
+    }
+    function clearModalAlerts() {
+        document.getElementById('modalAlert').style.display   = 'none';
+        document.getElementById('modalSuccess').style.display = 'none';
+    }
+    function fmtDate(s) {
+        if (!s) return '—';
+        return new Date(s).toLocaleDateString('en-KE', { day:'numeric', month:'short', year:'numeric' });
+    }
+
+    // ── Summary ───────────────────────────────────────────────────────────────
+    function updateSummary(s) {
+        document.getElementById('sTotal').textContent    = s.total    ?? 0;
+        document.getElementById('sActive').textContent   = s.active   ?? 0;
+        document.getElementById('sInactive').textContent = s.inactive ?? 0;
+    }
+
+    // ── Load ──────────────────────────────────────────────────────────────────
+    function resetAndLoad() { currentPage = 1; loadLocations(); }
+
+    async function loadLocations() {
+        const active = document.getElementById('activeFilter').value;
+        const search = document.getElementById('searchInput').value.trim();
+        const params = new URLSearchParams({ page: currentPage, limit: PAGE_SIZE });
+        if (active) params.set('active', active);
+        if (search) params.set('search', search);
+
+        document.getElementById('tableBody').innerHTML =
+            '<tr><td colspan="6" class="loading"><div class="loading-spinner"></div>Loading…</td></tr>';
+
+        try {
+            const r = await authFetch(`/api/admin/locations?${params}`);
+            if (!r.ok) {
+                if (r.status === 401) { window.location.href = 'login.html'; return; }
+                const d = await r.json().catch(() => ({}));
+                document.getElementById('tableBody').innerHTML =
+                    `<tr><td colspan="6" style="text-align:center;padding:48px;color:var(--error);">Error ${r.status}: ${esc(d.error || 'Failed to load')}</td></tr>`;
+                return;
+            }
+            const d = await r.json();
+            updateSummary(d.stats || {});
+            renderTable(d.locations || []);
+            renderPagination(d.total || 0);
+        } catch (e) {
+            console.error('[locations]', e);
+            document.getElementById('tableBody').innerHTML =
+                '<tr><td colspan="6" style="text-align:center;padding:48px;color:var(--error);">Network error. Please refresh.</td></tr>';
+        }
+    }
+
+    function renderTable(rows) {
+        const tbody = document.getElementById('tableBody');
+        if (!rows.length) {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:48px;color:var(--text2);">No locations found. <a href="#" onclick="openCreateModal()" style="color:var(--accent);">Add the first →</a></td></tr>`;
+            return;
+        }
+        tbody.innerHTML = rows.map(loc => `
+            <tr>
+                <td><strong>${esc(loc.name)}</strong></td>
+                <td style="color:var(--text2);">${esc(loc.area || '—')}</td>
+                <td class="coord-text">
+                    ${loc.latitude != null && loc.longitude != null
+                        ? `${Number(loc.latitude).toFixed(4)}, ${Number(loc.longitude).toFixed(4)}`
+                        : '—'}
+                </td>
+                <td><span class="status-badge ${loc.active ? 'status-active' : 'status-inactive'}">${loc.active ? 'Active' : 'Inactive'}</span></td>
+                <td style="color:var(--text2);font-size:12px;">${fmtDate(loc.created_at)}</td>
+                <td>
+                    <div class="action-buttons">
+                        <button class="btn-action btn-edit"   onclick="openEditModal(${esc(JSON.stringify(loc))})">Edit</button>
+                        ${loc.active
+                            ? `<button class="btn-action btn-delete" onclick="openDeleteModal('${loc.id}','${esc(loc.name)}')">Deactivate</button>`
+                            : `<button class="btn-action btn-approve" onclick="reactivate('${loc.id}','${esc(loc.name)}')">Reactivate</button>`
+                        }
+                    </div>
+                </td>
+            </tr>`
+        ).join('');
+    }
+
+    function renderPagination(total) {
+        const pages = Math.ceil(total / PAGE_SIZE);
+        const el = document.getElementById('pagination');
+        if (pages <= 1) { el.innerHTML = ''; return; }
+        el.innerHTML = Array.from({ length: pages }, (_, i) =>
+            `<button class="page-btn${i+1===currentPage?' active':''}" onclick="goPage(${i+1})">${i+1}</button>`
+        ).join('');
+    }
+    function goPage(n) { currentPage = n; loadLocations(); }
+
+    // ── Create modal ──────────────────────────────────────────────────────────
+    function openCreateModal() {
+        isEditing = false;
+        document.getElementById('modalTitle').textContent = 'Add Location';
+        document.getElementById('f_id').value   = '';
+        document.getElementById('f_name').value = '';
+        document.getElementById('f_area').value = '';
+        document.getElementById('f_lat').value  = '';
+        document.getElementById('f_lng').value  = '';
+        document.getElementById('f_active').checked = true;
+        clearModalAlerts();
+        document.getElementById('saveBtn').textContent = 'Add Location';
+        document.getElementById('locationModal').classList.add('active');
+        setTimeout(() => document.getElementById('f_name').focus(), 80);
+    }
+
+    // ── Edit modal ────────────────────────────────────────────────────────────
+    function openEditModal(loc) {
+        isEditing = true;
+        document.getElementById('modalTitle').textContent = 'Edit Location';
+        document.getElementById('f_id').value     = loc.id;
+        document.getElementById('f_name').value   = loc.name      || '';
+        document.getElementById('f_area').value   = loc.area      || '';
+        document.getElementById('f_lat').value    = loc.latitude  ?? '';
+        document.getElementById('f_lng').value    = loc.longitude ?? '';
+        document.getElementById('f_active').checked = Boolean(loc.active);
+        clearModalAlerts();
+        document.getElementById('saveBtn').textContent = 'Save Changes';
+        document.getElementById('locationModal').classList.add('active');
+        setTimeout(() => document.getElementById('f_name').focus(), 80);
+    }
+
+    function closeModal() {
+        document.getElementById('locationModal').classList.remove('active');
+    }
+
+    // ── Save ──────────────────────────────────────────────────────────────────
+    async function saveLocation() {
+        clearModalAlerts();
+        const id     = document.getElementById('f_id').value;
+        const name   = document.getElementById('f_name').value.trim();
+        const area   = document.getElementById('f_area').value.trim();
+        const lat    = document.getElementById('f_lat').value;
+        const lng    = document.getElementById('f_lng').value;
+        const active = document.getElementById('f_active').checked;
+
+        if (!name) { modalAlert('Location name is required'); return; }
+        if (!area) { modalAlert('Area description is required'); return; }
+
+        const btn = document.getElementById('saveBtn');
+        btn.disabled = true; btn.textContent = 'Saving…';
+
+        const body = {
+            name, area, active,
+            latitude:  lat ? parseFloat(lat) : null,
+            longitude: lng ? parseFloat(lng) : null,
+        };
+
+        try {
+            let r;
+            if (isEditing) {
+                r = await authFetch(`/api/admin/locations/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+            } else {
+                r = await authFetch('/api/admin/locations', { method: 'POST', body: JSON.stringify(body) });
+            }
+            const d = await r.json();
+            if (r.ok && d.success) {
+                modalOk(isEditing ? 'Location updated.' : `"${d.location?.name}" added.`);
+                btn.disabled = false; btn.textContent = isEditing ? 'Save Changes' : 'Add Location';
+                loadLocations();
+            } else {
+                modalAlert(d.error || 'Failed to save');
+                btn.disabled = false; btn.textContent = isEditing ? 'Save Changes' : 'Add Location';
+            }
+        } catch (e) {
+            modalAlert('Network error. Please try again.');
+            btn.disabled = false; btn.textContent = isEditing ? 'Save Changes' : 'Add Location';
+        }
+    }
+
+    // ── Delete (deactivate) ───────────────────────────────────────────────────
+    function openDeleteModal(id, name) {
+        deleteId = id;
+        document.getElementById('deleteLocationName').textContent = name;
+        document.getElementById('deleteModal').classList.add('active');
+    }
+    function closeDeleteModal() {
+        document.getElementById('deleteModal').classList.remove('active');
+        deleteId = null;
+    }
+    async function confirmDelete() {
+        if (!deleteId) return;
+        const btn = document.getElementById('confirmDeleteBtn');
+        btn.disabled = true; btn.textContent = 'Deactivating…';
+        try {
+            const r = await authFetch(`/api/admin/locations/${deleteId}`, { method: 'DELETE' });
+            const d = await r.json();
+            if (r.ok && d.success) { toast('Location deactivated'); closeDeleteModal(); loadLocations(); }
+            else toast(d.error || 'Failed', 'error');
+        } catch (e) { toast('Network error', 'error'); }
+        finally { btn.disabled = false; btn.textContent = 'Deactivate'; }
+    }
+
+    // ── Reactivate (inline, no modal needed) ─────────────────────────────────
+    async function reactivate(id, name) {
+        try {
+            const r = await authFetch(`/api/admin/locations/${id}`, {
+                method: 'PATCH', body: JSON.stringify({ active: true })
+            });
+            const d = await r.json();
+            if (r.ok && d.success) { toast(`"${name}" reactivated`); loadLocations(); }
+            else toast(d.error || 'Failed', 'error');
+        } catch (e) { toast('Network error', 'error'); }
+    }
+
+    loadLocations();
+    </script>
+</body>
+</html>

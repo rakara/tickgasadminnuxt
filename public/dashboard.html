@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - TickGas</title>
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="/css/admin.css">
+    <link rel="icon" type="image/png" href="/icons/favicon.png">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0a0a0a">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    
+    
+    <script src="/js/api.js"></script>
+    <script src="/js/sidebar.js"></script>
+</head>
+<body>
+    <script>if (!requireAuth()) throw new Error("redirect");</script>
+    <script>renderSidebar('dashboard');</script>
+    <div class="container">
+
+        <div class="main">
+            <div class="header">
+                <div>
+                    <h1>Dashboard Overview</h1>
+                    <div class="date" id="currentDate"></div>
+                </div>
+            </div>
+
+            <div class="error-message" id="errorMessage">
+                <span>⚠️</span>
+                <span id="errorText"></span>
+            </div>
+
+            <div class="stats-grid" id="statsGrid">
+                <div class="stat-card">
+                    <div class="stat-label">Total Revenue</div>
+                    <div class="stat-value" id="totalRevenue">---</div>
+                    <div class="stat-change" id="revenueChange">Loading...</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Total Orders</div>
+                    <div class="stat-value" id="totalOrders">---</div>
+                    <div class="stat-change" id="ordersChange">Loading...</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Active Suppliers</div>
+                    <div class="stat-value" id="activeSuppliers">---</div>
+                    <div class="stat-change" id="suppliersChange">Loading...</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Pending Approvals</div>
+                    <div class="stat-value" id="pendingApprovals">---</div>
+                    <div class="stat-change" id="pendingChange">Needs review</div>
+                </div>
+            </div>
+
+            <div class="charts-row">
+                <div class="chart-card">
+                    <div class="chart-title">
+                        <span>Revenue Overview</span>
+                        <select id="revenuePeriod" onchange="loadDashboardData()">
+                            <option value="week">Last 7 Days</option>
+                            <option value="month">This Month</option>
+                            <option value="year">This Year</option>
+                        </select>
+                    </div>
+                    <div class="chart-container" id="revenueChart"></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">Order Status</div>
+                    <div class="status-list" id="orderStatusList"></div>
+                </div>
+            </div>
+
+            <div class="recent-section">
+                <div class="section-header">
+                    <h2>Recent Orders</h2>
+                    <a href="orders.html" class="view-all">View All →</a>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Order ID</th>
+                            <th>Customer</th>
+                            <th>Supplier</th>
+                            <th>Amount</th>
+                            <th>Status</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recentOrdersTable">
+                        <tr>
+                            <td colspan="6" class="loading">
+                                <div class="loading-spinner"></div>
+                                Loading orders...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('currentDate').textContent = new Date().toLocaleDateString('en-US', { 
+            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+        });
+
+        function showError(message) {
+            const errorEl = document.getElementById('errorMessage');
+            document.getElementById('errorText').textContent = message;
+            errorEl.classList.add('show');
+            setTimeout(() => errorEl.classList.remove('show'), 5000);
+        }
+
+        async function loadDashboardData() {
+            const period = document.getElementById('revenuePeriod').value;
+
+            try {
+                const response = await authFetch(`/api/admin/dashboard?period=${period}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    updateStats(data.stats);
+                    updateRevenueChart(data.revenueData, data.labels);
+                    updateOrderStatus(data.statusCounts);
+                    updateRecentOrders(data.recentOrders);
+                } else {
+                    throw new Error(data.error || 'Failed to load data');
+                }
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+                showError('Failed to load dashboard data');
+                
+                // Fallback to empty state
+                document.getElementById('totalRevenue').textContent = 'KSh 0';
+                document.getElementById('totalOrders').textContent = '0';
+                document.getElementById('activeSuppliers').textContent = '0';
+                document.getElementById('pendingApprovals').textContent = '0';
+            }
+        }
+
+        function updateStats(stats) {
+            document.getElementById('totalRevenue').textContent = `KSh ${(stats?.totalRevenue || 0).toLocaleString()}`;
+            document.getElementById('totalOrders').textContent = stats?.totalOrders || 0;
+            document.getElementById('activeSuppliers').textContent = stats?.activeSuppliers || 0;
+            document.getElementById('pendingApprovals').textContent = stats?.pendingApprovals || 0;
+
+            // Update change indicators (you can calculate these from historical data)
+            document.getElementById('revenueChange').innerHTML = `↑ ${stats?.revenueGrowth || 0}% from last month`;
+            document.getElementById('ordersChange').innerHTML = `↑ ${stats?.ordersGrowth || 0}% from last month`;
+            document.getElementById('suppliersChange').innerHTML = `+${stats?.newSuppliers || 0} this month`;
+        }
+
+        function updateRevenueChart(data, labels) {
+            const chart = document.getElementById('revenueChart');
+            const values = data || [0, 0, 0, 0, 0, 0, 0];
+            const max = Math.max(...values, 1);
+
+            chart.innerHTML = values.map((value, i) => {
+                const height = (value / max) * 200;
+                return `
+                    <div class="chart-bar-wrapper">
+                        <div class="chart-bar" style="height: ${height}px;"></div>
+                        <div class="chart-label">${labels?.[i] || ''}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateOrderStatus(counts) {
+            const list = document.getElementById('orderStatusList');
+            const statuses = counts || {
+                pending: 0,
+                confirmed: 0,
+                delivered: 0,
+                cancelled: 0
+            };
+
+            list.innerHTML = Object.entries(statuses).map(([status, count]) => `
+                <div class="status-item">
+                    <div class="status-info">
+                        <span class="status-dot ${status}"></span>
+                        <span>${status.charAt(0).toUpperCase() + status.slice(1)}</span>
+                    </div>
+                    <span class="status-count">${count}</span>
+                </div>
+            `).join('');
+        }
+
+        function updateRecentOrders(orders) {
+            const tbody = document.getElementById('recentOrdersTable');
+            
+            if (!orders || orders.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:40px;">No recent orders</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = orders.map(order => `
+                <tr>
+                    <td>#${order.order_number || 'N/A'}</td>
+                    <td>${order.users?.name || 'N/A'}</td>
+                    <td>${order.suppliers?.name || 'N/A'}</td>
+                    <td>KSh ${(order.total_amount || 0).toLocaleString()}</td>
+                    <td><span class="status-badge status-${order.status || 'pending'}">${order.status || 'pending'}</span></td>
+                    <td>${new Date(order.created_at).toLocaleDateString()}</td>
+                </tr>
+            `).join('');
+        }
+
+        // Auto-refresh every 60 seconds
+        setInterval(loadDashboardData, 60000);
+
+        // Initial load
+        loadDashboardData();
+    </script>
+</body>
+</html>

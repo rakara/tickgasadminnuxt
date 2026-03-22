@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Agents — TickGas Admin</title>
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="/css/admin.css">
+    <link rel="icon" type="image/png" href="/icons/favicon.png">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0a0a0a">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <script src="/js/api.js"></script>
+    <script src="/js/sidebar.js"></script>
+    <style>
+        /* ── Summary cards ── */
+        .summary-cards { display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px; }
+        .summary-card { background:var(--card-bg,#1a1a2e);border:1px solid var(--border,rgba(255,255,255,0.08));border-radius:16px;padding:20px 24px; }
+        .summary-card .label { font-size:12px;color:#888;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px; }
+        .summary-card .value { font-size:26px;font-weight:700;color:#fff; }
+        .summary-card.blue .value  { color:#6ab0ff; }
+        .summary-card.green .value { color:#2dce89; }
+
+        /* ── Shared modal base ── */
+        .modal-overlay {
+            position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:200;
+            display:none;align-items:center;justify-content:center;
+            backdrop-filter:blur(4px);padding:16px;
+        }
+        .modal-overlay.open { display:flex; }
+        .modal {
+            background:#161a24;border:1px solid rgba(255,255,255,0.1);
+            border-radius:20px;padding:36px;width:100%;max-width:480px;
+            position:relative;max-height:90vh;overflow-y:auto;
+        }
+        .modal h2 { font-size:18px;font-weight:700;margin-bottom:4px;color:#f0f4ff; }
+        .modal .sub { color:#7a8599;font-size:13px;margin-bottom:28px;line-height:1.5; }
+        .modal-close {
+            position:absolute;top:16px;right:16px;background:transparent;
+            border:none;color:#555;font-size:20px;cursor:pointer;padding:4px 8px;
+            line-height:1;border-radius:6px;transition:color 0.15s,background 0.15s;
+        }
+        .modal-close:hover { color:#fff;background:rgba(255,255,255,0.06); }
+
+        /* ── Form elements ── */
+        .form-group { margin-bottom:18px; }
+        .form-group label {
+            display:block;font-size:11px;font-weight:600;color:#7a8599;
+            margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em;
+        }
+        .form-group input, .form-group textarea, .form-group select {
+            width:100%;background:rgba(255,255,255,0.05);
+            border:1px solid rgba(255,255,255,0.09);border-radius:10px;
+            padding:12px 14px;color:#f0f4ff;font-size:14px;
+            outline:none;font-family:inherit;transition:border-color 0.2s,background 0.2s;
+            resize:vertical;
+        }
+        .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+            border-color:#3d7fff;background:rgba(61,127,255,0.05);
+        }
+        .form-group input::placeholder, .form-group textarea::placeholder { color:#444; }
+        .form-row { display:grid;grid-template-columns:1fr 1fr;gap:14px; }
+        .pin-hint { font-size:11px;color:#555;margin-top:5px;line-height:1.4; }
+
+        .btn-submit {
+            width:100%;background:#3d7fff;color:#fff;border:none;
+            border-radius:12px;padding:14px;font-weight:700;font-size:14px;
+            cursor:pointer;margin-top:8px;transition:opacity 0.2s;font-family:inherit;
+        }
+        .btn-submit:hover { opacity:0.88; }
+        .btn-submit:disabled { opacity:0.4;cursor:not-allowed; }
+        .btn-submit.danger { background:#ff4d6d; }
+        .btn-submit.warning { background:#e8900a; }
+
+        .form-alert { border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:16px;display:none;line-height:1.5; }
+        .form-alert.error   { background:rgba(255,77,109,0.1);border:1px solid rgba(255,77,109,0.3);color:#ff7a95; }
+        .form-alert.success { background:rgba(45,206,137,0.1);border:1px solid rgba(45,206,137,0.3);color:#2dce89; }
+        .form-alert.show { display:block; }
+
+        /* ── Table enhancements ── */
+        .stats-mini { display:flex;gap:10px;align-items:center; }
+        .mini-stat { text-align:center; }
+        .mini-stat .n { font-size:15px;font-weight:700;color:#fff; }
+        .mini-stat .l { font-size:10px;color:#666; }
+        .mini-sep { width:1px;height:28px;background:rgba(255,255,255,0.07); }
+
+        .status-badge {
+            display:inline-flex;align-items:center;gap:6px;
+            padding:4px 10px;border-radius:100px;font-size:11px;font-weight:600;
+        }
+        .status-dot { width:7px;height:7px;border-radius:50%;flex-shrink:0; }
+        .badge-active    { background:rgba(45,206,137,0.12);border:1px solid rgba(45,206,137,0.25);color:#2dce89; }
+        .badge-active    .status-dot { background:#2dce89; }
+        .badge-suspended { background:rgba(255,170,0,0.12);border:1px solid rgba(255,170,0,0.25);color:#ffaa00; }
+        .badge-suspended .status-dot { background:#ffaa00; }
+        .badge-inactive  { background:rgba(120,120,120,0.1);border:1px solid rgba(120,120,120,0.2);color:#888; }
+        .badge-inactive  .status-dot { background:#666; }
+
+        .action-menu { display:flex;gap:6px;flex-wrap:wrap; }
+        .btn-sm {
+            padding:5px 12px;border-radius:8px;font-size:11px;font-weight:600;
+            cursor:pointer;border:1px solid;transition:all 0.15s;
+            white-space:nowrap;background:transparent;font-family:inherit;
+        }
+        .btn-edit     { border-color:rgba(106,176,255,0.35);color:#6ab0ff; }
+        .btn-edit:hover { background:rgba(106,176,255,0.1); }
+        .btn-suspend  { border-color:rgba(255,170,0,0.35);color:#ffaa00; }
+        .btn-suspend:hover { background:rgba(255,170,0,0.1); }
+        .btn-activate { border-color:rgba(45,206,137,0.35);color:#2dce89; }
+        .btn-activate:hover { background:rgba(45,206,137,0.1); }
+        .btn-deactivate { border-color:rgba(120,120,120,0.35);color:#888; }
+        .btn-deactivate:hover { background:rgba(120,120,120,0.08); }
+
+        /* Suspension reason pill shown in table */
+        .suspension-reason {
+            font-size:11px;color:#ffaa00;margin-top:3px;
+            max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+        }
+
+        /* Divider inside modal */
+        .modal-divider { border:none;border-top:1px solid rgba(255,255,255,0.07);margin:20px 0; }
+
+        @media (max-width:600px) {
+            .summary-cards { grid-template-columns:1fr 1fr; }
+            .form-row { grid-template-columns:1fr; }
+        }
+    </style>
+</head>
+<body>
+    <script>if (!requireAuth()) throw new Error('redirect');</script>
+    <script>renderSidebar('agents');</script>
+    <div class="container">
+
+        <div class="main">
+            <div class="header">
+                <h1>Agent Management</h1>
+                <div class="header-controls">
+                    <button class="refresh-btn" onclick="loadAgents()">↻ Refresh</button>
+                    <button class="btn-primary" onclick="openCreateModal()" style="margin-left:12px;">+ Add Agent</button>
+                </div>
+            </div>
+
+            <!-- Summary cards -->
+            <div class="summary-cards">
+                <div class="summary-card blue">
+                    <div class="label">Total Agents</div>
+                    <div class="value" id="sumTotal">—</div>
+                </div>
+                <div class="summary-card green">
+                    <div class="label">Active</div>
+                    <div class="value" id="sumActive">—</div>
+                </div>
+                <div class="summary-card">
+                    <div class="label">Total Onboarded</div>
+                    <div class="value" id="sumOnboarded">—</div>
+                </div>
+                <div class="summary-card">
+                    <div class="label">Pending Approvals</div>
+                    <div class="value" id="sumPending">—</div>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="filters">
+                <select class="filter-select" id="statusFilter" onchange="resetAndLoad()">
+                    <option value="">All Status</option>
+                    <option value="active">Active</option>
+                    <option value="suspended">Suspended</option>
+                    <option value="inactive">Inactive</option>
+                </select>
+                <input type="text" class="search-box" id="searchInput"
+                    placeholder="Search by name, phone, region…" oninput="resetAndLoad()">
+            </div>
+
+            <!-- Table -->
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Agent</th>
+                            <th>Phone</th>
+                            <th>Region</th>
+                            <th>Onboarding Stats</th>
+                            <th>Last Login</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                        <tr><td colspan="7" class="loading"><div class="loading-spinner"></div>Loading…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div id="pagination" style="display:flex;gap:8px;justify-content:center;padding:20px;flex-wrap:wrap;"></div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════
+         CREATE AGENT MODAL
+    ══════════════════════════════════════════ -->
+    <div class="modal-overlay" id="createModal">
+        <div class="modal">
+            <button class="modal-close" onclick="closeModal('createModal')">✕</button>
+            <h2>Add New Agent</h2>
+            <p class="sub">The agent will use their phone number and PIN to log in to the Agent Portal.</p>
+
+            <div class="form-alert error"   id="createAlert"></div>
+            <div class="form-alert success" id="createSuccess"></div>
+
+            <form autocomplete="off" onsubmit="event.preventDefault(); submitCreate();">
+            <div class="form-group">
+                <label>Full Name *</label>
+                <input type="text" id="c_name" placeholder="e.g. James Kariuki" autocomplete="name">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Phone Number *</label>
+                    <input type="tel" id="c_phone" placeholder="e.g. 0712 345 678" autocomplete="tel">
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="c_email" placeholder="agent@tickgas.com" autocomplete="email">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Region / Territory</label>
+                <input type="text" id="c_region" placeholder="e.g. Nairobi West, Mombasa" autocomplete="off">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Initial PIN *</label>
+                    <input type="password" id="c_pin" placeholder="4–6 digits" maxlength="6" inputmode="numeric" autocomplete="new-password">
+                    <div class="pin-hint">Share this PIN securely with the agent after creation.</div>
+                </div>
+                <div class="form-group">
+                    <label>Confirm PIN *</label>
+                    <input type="password" id="c_pinConfirm" placeholder="Repeat PIN" maxlength="6" inputmode="numeric" autocomplete="new-password">
+                </div>
+            </div>
+
+            <button type="submit" class="btn-submit" id="createBtn">Create Agent Account</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════
+         EDIT AGENT MODAL
+    ══════════════════════════════════════════ -->
+    <div class="modal-overlay" id="editModal">
+        <div class="modal">
+            <button class="modal-close" onclick="closeModal('editModal')">✕</button>
+            <h2>Edit Agent</h2>
+            <p class="sub">Update the agent's details. Leave PIN fields blank to keep the current PIN.</p>
+
+            <div class="form-alert error"   id="editAlert"></div>
+            <div class="form-alert success" id="editSuccess"></div>
+
+            <form autocomplete="off" onsubmit="event.preventDefault(); submitEdit();">
+            <input type="hidden" id="e_id">
+
+            <div class="form-group">
+                <label>Full Name *</label>
+                <input type="text" id="e_name" placeholder="Full name" autocomplete="name">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Phone Number *</label>
+                    <input type="tel" id="e_phone" placeholder="e.g. 0712 345 678" autocomplete="tel">
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="e_email" placeholder="agent@tickgas.com" autocomplete="email">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Region / Territory</label>
+                <input type="text" id="e_region" placeholder="e.g. Nairobi West" autocomplete="off">
+            </div>
+
+            <hr class="modal-divider">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>New PIN <span style="color:#555;font-weight:400;">(optional)</span></label>
+                    <input type="password" id="e_pin" placeholder="Leave blank to keep" maxlength="6" inputmode="numeric" autocomplete="new-password">
+                </div>
+                <div class="form-group">
+                    <label>Confirm New PIN</label>
+                    <input type="password" id="e_pinConfirm" placeholder="Repeat new PIN" maxlength="6" inputmode="numeric" autocomplete="new-password">
+                </div>
+            </div>
+
+            <button type="submit" class="btn-submit" id="editBtn">Save Changes</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════
+         SUSPEND AGENT MODAL
+    ══════════════════════════════════════════ -->
+    <div class="modal-overlay" id="suspendModal">
+        <div class="modal" style="max-width:420px;">
+            <button class="modal-close" onclick="closeModal('suspendModal')">✕</button>
+            <h2>Suspend Agent</h2>
+            <p class="sub" id="suspendSubtitle">Provide a reason — this will be shown to the agent when they attempt to log in.</p>
+
+            <div class="form-alert error" id="suspendAlert"></div>
+
+            <input type="hidden" id="s_id">
+            <div class="form-group">
+                <label>Suspension Reason *</label>
+                <textarea id="s_reason" placeholder="e.g. Fraudulent onboarding activity detected" rows="3"></textarea>
+            </div>
+
+            <button class="btn-submit warning" id="suspendBtn" onclick="submitSuspend()">Suspend Agent</button>
+        </div>
+    </div>
+
+    <script>
+    // ═══════════════════════════════════════════════════════
+    //  State
+    // ═══════════════════════════════════════════════════════
+    let currentPage = 1;
+    const PAGE_SIZE  = 20;
+
+    // ═══════════════════════════════════════════════════════
+    //  Summary
+    // ═══════════════════════════════════════════════════════
+    function updateSummary(s) {
+        document.getElementById('sumTotal').textContent      = s.totalAgents     ?? 0;
+        document.getElementById('sumActive').textContent     = s.activeAgents    ?? 0;
+        document.getElementById('sumOnboarded').textContent  = s.totalOnboarded  ?? 0;
+        document.getElementById('sumPending').textContent    = s.pendingApprovals ?? 0;
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  Load & render agents
+    // ═══════════════════════════════════════════════════════
+    function resetAndLoad() {
+        currentPage = 1;
+        loadAgents();
+    }
+
+    async function loadAgents() {
+        const status = document.getElementById('statusFilter').value;
+        const search = document.getElementById('searchInput').value.trim();
+        const params = new URLSearchParams({ page: currentPage, limit: PAGE_SIZE });
+        if (status) params.set('status', status);
+        if (search) params.set('search', search);
+
+        document.getElementById('tableBody').innerHTML =
+            '<tr><td colspan="7" class="loading"><div class="loading-spinner"></div>Loading…</td></tr>';
+
+        try {
+            const r = await authFetch(`/api/admin/agents?${params}`);
+            if (!r.ok) {
+                if (r.status === 401) { window.location.href = 'login.html'; return; }
+                const d = await r.json().catch(() => ({}));
+                document.getElementById('tableBody').innerHTML =
+                    `<tr><td colspan="7" style="text-align:center;padding:48px;color:#ff4d6d;">Failed to load (${r.status}): ${d.error || 'Unknown error'}</td></tr>`;
+                return;
+            }
+            const d = await r.json();
+            if (!d.success) return;
+            updateSummary(d.summary || {});
+            renderTable(d.agents || []);
+            renderPagination(d.total || 0);
+        } catch (e) {
+            console.error('[admin/agents]', e);
+            document.getElementById('tableBody').innerHTML =
+                '<tr><td colspan="7" style="text-align:center;padding:48px;color:#ff4d6d;">Network error. Please refresh.</td></tr>';
+        }
+    }
+
+    function renderTable(agents) {
+        const tbody = document.getElementById('tableBody');
+        if (!agents.length) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:48px;color:#888;">No agents found. <a href="#" onclick="openCreateModal()" style="color:#6ab0ff;">Add the first agent →</a></td></tr>';
+            return;
+        }
+        tbody.innerHTML = agents.map(a => {
+            const s          = a.stats || {};
+            const badgeCls   = `badge-${a.status}`;
+            const statusLabel = a.status.charAt(0).toUpperCase() + a.status.slice(1);
+            const loginStr   = a.last_login
+                ? new Date(a.last_login).toLocaleDateString('en-KE', { day:'numeric', month:'short', year:'numeric' })
+                : 'Never';
+
+            const reasonHtml = (a.status === 'suspended' && a.suspension_reason)
+                ? `<div class="suspension-reason" title="${escHtml(a.suspension_reason)}">⚠ ${escHtml(a.suspension_reason)}</div>`
+                : '';
+
+            // Action buttons based on current status
+            const actions = [];
+            actions.push(`<button class="btn-sm btn-edit" onclick="openEditModal(${jsonAttr(a)})">Edit</button>`);
+            if (a.status === 'active') {
+                actions.push(`<button class="btn-sm btn-suspend" onclick="openSuspendModal('${a.id}','${escHtml(a.name)}')">Suspend</button>`);
+                actions.push(`<button class="btn-sm btn-deactivate" onclick="doSetStatus('${a.id}','inactive','${escHtml(a.name)}')">Deactivate</button>`);
+            } else if (a.status === 'suspended') {
+                actions.push(`<button class="btn-sm btn-activate" onclick="doSetStatus('${a.id}','active','${escHtml(a.name)}')">Reactivate</button>`);
+            } else {
+                // inactive
+                actions.push(`<button class="btn-sm btn-activate" onclick="doSetStatus('${a.id}','active','${escHtml(a.name)}')">Activate</button>`);
+            }
+
+            return `
+                <tr>
+                    <td>
+                        <div style="font-weight:600;color:#f0f4ff;">${escHtml(a.name)}</div>
+                        <div style="font-size:11px;color:#555;margin-top:2px;">${a.email ? escHtml(a.email) : '—'}</div>
+                    </td>
+                    <td style="color:#aaa;">${a.phone}</td>
+                    <td style="color:#aaa;">${a.region ? escHtml(a.region) : '—'}</td>
+                    <td>
+                        <div class="stats-mini">
+                            <div class="mini-stat"><div class="n">${s.total_onboarded||0}</div><div class="l">Total</div></div>
+                            <div class="mini-sep"></div>
+                            <div class="mini-stat"><div class="n" style="color:#2dce89">${s.total_approved||0}</div><div class="l">Approved</div></div>
+                            <div class="mini-sep"></div>
+                            <div class="mini-stat"><div class="n" style="color:#ffaa00">${s.total_pending||0}</div><div class="l">Pending</div></div>
+                            <div class="mini-sep"></div>
+                            <div class="mini-stat"><div class="n">${s.this_month||0}</div><div class="l">This month</div></div>
+                        </div>
+                    </td>
+                    <td style="color:#aaa;font-size:12px;">${loginStr}</td>
+                    <td>
+                        <span class="status-badge ${badgeCls}">
+                            <span class="status-dot"></span>${statusLabel}
+                        </span>
+                        ${reasonHtml}
+                    </td>
+                    <td><div class="action-menu">${actions.join('')}</div></td>
+                </tr>`;
+        }).join('');
+    }
+
+    function renderPagination(total) {
+        const pages = Math.ceil(total / PAGE_SIZE);
+        const el = document.getElementById('pagination');
+        if (pages <= 1) { el.innerHTML = ''; return; }
+        el.innerHTML = Array.from({ length: pages }, (_, i) => {
+            const active = i + 1 === currentPage;
+            return `<button style="padding:7px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.08);background:${active?'#3d7fff':'transparent'};color:${active?'#fff':'#888'};cursor:pointer;font-size:13px;transition:all 0.15s;" onclick="goPage(${i+1})">${i+1}</button>`;
+        }).join('');
+    }
+    function goPage(n) { currentPage = n; loadAgents(); }
+
+    // ═══════════════════════════════════════════════════════
+    //  Modal helpers
+    // ═══════════════════════════════════════════════════════
+    function closeModal(id) {
+        document.getElementById(id).classList.remove('open');
+    }
+    // Close on backdrop click
+    document.querySelectorAll('.modal-overlay').forEach(el => {
+        el.addEventListener('click', function(e) { if (e.target === this) closeModal(this.id); });
+    });
+    // Close on Escape
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(el => closeModal(el.id));
+    });
+
+    function setAlert(id, msg, type = 'error') {
+        const el = document.getElementById(id);
+        el.textContent = msg;
+        el.className   = `form-alert ${type} show`;
+        // Hide the opposite
+        const opp = id.replace('Alert','Success').replace('Success','Alert');
+        if (opp !== id) { const o = document.getElementById(opp); if (o) o.classList.remove('show'); }
+    }
+    function clearAlerts(...ids) { ids.forEach(id => { const el = document.getElementById(id); if(el) el.classList.remove('show'); }); }
+
+    // ═══════════════════════════════════════════════════════
+    //  CREATE modal
+    // ═══════════════════════════════════════════════════════
+    function openCreateModal() {
+        clearAlerts('createAlert','createSuccess');
+        ['c_name','c_phone','c_email','c_region','c_pin','c_pinConfirm'].forEach(id => {
+            document.getElementById(id).value = '';
+        });
+        document.getElementById('createBtn').disabled = false;
+        document.getElementById('createBtn').textContent = 'Create Agent Account';
+        document.getElementById('createModal').classList.add('open');
+        setTimeout(() => document.getElementById('c_name').focus(), 80);
+    }
+
+    async function submitCreate() {
+        clearAlerts('createAlert','createSuccess');
+        const name       = document.getElementById('c_name').value.trim();
+        const phone      = document.getElementById('c_phone').value.trim();
+        const email      = document.getElementById('c_email').value.trim();
+        const region     = document.getElementById('c_region').value.trim();
+        const pin        = document.getElementById('c_pin').value;
+        const pinConfirm = document.getElementById('c_pinConfirm').value;
+
+        if (!name)                    { setAlert('createAlert','Full name is required'); return; }
+        if (!phone)                   { setAlert('createAlert','Phone number is required'); return; }
+        if (!pin || pin.length < 4)   { setAlert('createAlert','PIN must be at least 4 digits'); return; }
+        if (pin !== pinConfirm)        { setAlert('createAlert','PINs do not match'); return; }
+
+        const btn = document.getElementById('createBtn');
+        btn.disabled = true; btn.textContent = 'Creating…';
+
+        try {
+            const r = await authFetch('/api/admin/agents', {
+                method: 'POST',
+                body: JSON.stringify({ name, phone, email: email||undefined, region: region||undefined, pin })
+            });
+            const d = await r.json();
+            if (r.ok && d.success) {
+                setAlert('createSuccess', `Agent "${d.agent.name}" created successfully.`, 'success');
+                btn.textContent = 'Create Agent Account';
+                btn.disabled = false;
+                loadAgents();
+            } else {
+                setAlert('createAlert', d.error || 'Failed to create agent');
+                btn.disabled = false; btn.textContent = 'Create Agent Account';
+            }
+        } catch (e) {
+            setAlert('createAlert', 'Network error. Please try again.');
+            btn.disabled = false; btn.textContent = 'Create Agent Account';
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  EDIT modal
+    // ═══════════════════════════════════════════════════════
+    function openEditModal(agent) {
+        clearAlerts('editAlert','editSuccess');
+        document.getElementById('e_id').value     = agent.id;
+        document.getElementById('e_name').value   = agent.name   || '';
+        document.getElementById('e_phone').value  = agent.phone  || '';
+        document.getElementById('e_email').value  = agent.email  || '';
+        document.getElementById('e_region').value = agent.region || '';
+        document.getElementById('e_pin').value        = '';
+        document.getElementById('e_pinConfirm').value = '';
+        document.getElementById('editBtn').disabled    = false;
+        document.getElementById('editBtn').textContent = 'Save Changes';
+        document.getElementById('editModal').classList.add('open');
+        setTimeout(() => document.getElementById('e_name').focus(), 80);
+    }
+
+    async function submitEdit() {
+        clearAlerts('editAlert','editSuccess');
+        const agentId    = document.getElementById('e_id').value;
+        const name       = document.getElementById('e_name').value.trim();
+        const phone      = document.getElementById('e_phone').value.trim();
+        const email      = document.getElementById('e_email').value.trim();
+        const region     = document.getElementById('e_region').value.trim();
+        const pin        = document.getElementById('e_pin').value;
+        const pinConfirm = document.getElementById('e_pinConfirm').value;
+
+        if (!name)  { setAlert('editAlert','Full name is required'); return; }
+        if (!phone) { setAlert('editAlert','Phone number is required'); return; }
+        if (pin && pin.length < 4)  { setAlert('editAlert','New PIN must be at least 4 digits'); return; }
+        if (pin && pin !== pinConfirm) { setAlert('editAlert','New PINs do not match'); return; }
+
+        const body = { agentId, name, phone, email: email||'', region: region||'' };
+        if (pin) body.pin = pin;
+
+        const btn = document.getElementById('editBtn');
+        btn.disabled = true; btn.textContent = 'Saving…';
+
+        try {
+            const r = await authFetch('/api/admin/agents', {
+                method: 'PATCH',
+                body: JSON.stringify(body)
+            });
+            const d = await r.json();
+            if (r.ok && d.success) {
+                setAlert('editSuccess', 'Agent updated successfully.', 'success');
+                btn.textContent = 'Save Changes';
+                btn.disabled = false;
+                loadAgents();
+            } else {
+                setAlert('editAlert', d.error || 'Failed to update agent');
+                btn.disabled = false; btn.textContent = 'Save Changes';
+            }
+        } catch (e) {
+            setAlert('editAlert', 'Network error. Please try again.');
+            btn.disabled = false; btn.textContent = 'Save Changes';
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  SUSPEND modal
+    // ═══════════════════════════════════════════════════════
+    function openSuspendModal(agentId, agentName) {
+        clearAlerts('suspendAlert');
+        document.getElementById('s_id').value = agentId;
+        document.getElementById('s_reason').value = '';
+        document.getElementById('suspendSubtitle').textContent =
+            `Suspending "${agentName}". Provide a reason — it will be shown to the agent when they try to log in.`;
+        document.getElementById('suspendBtn').disabled = false;
+        document.getElementById('suspendBtn').textContent = 'Suspend Agent';
+        document.getElementById('suspendModal').classList.add('open');
+        setTimeout(() => document.getElementById('s_reason').focus(), 80);
+    }
+
+    async function submitSuspend() {
+        clearAlerts('suspendAlert');
+        const agentId = document.getElementById('s_id').value;
+        const reason  = document.getElementById('s_reason').value.trim();
+        if (!reason) { setAlert('suspendAlert','Please provide a reason for the suspension'); return; }
+
+        const btn = document.getElementById('suspendBtn');
+        btn.disabled = true; btn.textContent = 'Suspending…';
+
+        try {
+            const r = await authFetch('/api/admin/agents', {
+                method: 'PUT',
+                body: JSON.stringify({ agentId, status: 'suspended', suspension_reason: reason })
+            });
+            const d = await r.json();
+            if (r.ok && d.success) {
+                closeModal('suspendModal');
+                loadAgents();
+            } else {
+                setAlert('suspendAlert', d.error || 'Failed to suspend agent');
+                btn.disabled = false; btn.textContent = 'Suspend Agent';
+            }
+        } catch (e) {
+            setAlert('suspendAlert', 'Network error. Please try again.');
+            btn.disabled = false; btn.textContent = 'Suspend Agent';
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  Quick status change (activate / deactivate)
+    // ═══════════════════════════════════════════════════════
+    async function doSetStatus(agentId, status, agentName) {
+        const label = status === 'active' ? 'reactivate' : 'deactivate';
+        if (!confirm(`${label.charAt(0).toUpperCase()+label.slice(1)} "${agentName}"?`)) return;
+        try {
+            const r = await authFetch('/api/admin/agents', {
+                method: 'PUT',
+                body: JSON.stringify({ agentId, status })
+            });
+            const d = await r.json();
+            if (r.ok && d.success) loadAgents();
+            else alert(d.error || 'Update failed');
+        } catch (e) { alert('Network error'); }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  Utilities
+    // ═══════════════════════════════════════════════════════
+    function escHtml(str) {
+        return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    // Serialize agent object safely into an onclick attribute
+    function jsonAttr(obj) {
+        return escHtml(JSON.stringify(obj));
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  Init
+    // ═══════════════════════════════════════════════════════
+    loadAgents();
+    </script>
+</body>
+</html>

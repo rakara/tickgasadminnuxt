@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Suppliers — TickGas Admin</title>
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="/css/admin.css">
+    <link rel="icon" type="image/png" href="/icons/favicon.png">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0a0a0a">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <script src="/js/api.js"></script>
+    <script src="/js/sidebar.js"></script>
+    <style>
+        .summary-cards { display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-bottom:28px; }
+        .summary-card  { background:var(--bg1);border:1px solid var(--border);border-radius:16px;padding:18px 20px; }
+        .summary-card .label { font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px; }
+        .summary-card .value { font-size:24px;font-weight:800;font-family:var(--mono); }
+        .supplier-meta  { font-size:11px;color:var(--text2);margin-top:2px; }
+        .ref-badge { font-size:11px;color:var(--info);background:rgba(77,166,255,.08);padding:2px 8px;border-radius:6px;font-family:var(--mono); }
+
+        /* Wider modal for supplier form */
+        .modal-content.wide { max-width:620px; }
+        .form-row-3 { display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px; }
+
+        @media (max-width:600px) {
+            .summary-cards  { grid-template-columns:1fr 1fr; }
+            .form-row-3     { grid-template-columns:1fr; }
+        }
+    </style>
+</head>
+<body>
+    <script>if (!requireAuth()) throw new Error('redirect');</script>
+    <script>renderSidebar('suppliers');</script>
+    <div class="container">
+
+        <div class="main">
+            <div class="header">
+                <h1>Supplier Management</h1>
+                <div class="header-controls">
+                    <button class="refresh-btn" onclick="resetAndLoad()">↻ Refresh</button>
+                    <button class="btn-primary" onclick="openCreateModal()" style="margin-left:12px;">+ Add Supplier</button>
+                </div>
+            </div>
+
+            <div class="summary-cards">
+                <div class="summary-card"><div class="label">Total</div><div class="value" id="sTotal">—</div></div>
+                <div class="summary-card"><div class="label">Pending</div><div class="value" id="sPending" style="color:var(--warning)">—</div></div>
+                <div class="summary-card"><div class="label">Approved</div><div class="value" id="sApproved" style="color:var(--success)">—</div></div>
+                <div class="summary-card"><div class="label">Rejected</div><div class="value" id="sRejected" style="color:var(--error)">—</div></div>
+                <div class="summary-card"><div class="label">Verified</div><div class="value" id="sVerified" style="color:var(--info)">—</div></div>
+            </div>
+
+            <div class="filters">
+                <select class="filter-select" id="statusFilter" onchange="resetAndLoad()">
+                    <option value="">All Status</option>
+                    <option value="pending">Pending</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
+                    <option value="suspended">Suspended</option>
+                </select>
+                <input type="text" class="search-box" id="searchInput" placeholder="Search by name, phone, location…" oninput="resetAndLoad()">
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Supplier</th>
+                            <th>Contact</th>
+                            <th>Location</th>
+                            <th>Onboarding</th>
+                            <th>Pricing</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                        <tr><td colspan="7" class="loading"><div class="loading-spinner"></div>Loading…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="pagination" id="pagination"></div>
+        </div>
+    </div>
+
+    <!-- ── CREATE / EDIT MODAL ─────────────────────────────────── -->
+    <div class="modal" id="supplierModal">
+        <div class="modal-content wide">
+            <div class="modal-header">
+                <h2 id="modalTitle">Add Supplier</h2>
+                <button class="close-btn" onclick="closeModal()">×</button>
+            </div>
+
+            <div id="modalAlert" class="error-message" style="display:none;margin-bottom:16px;padding:10px 14px;border-radius:8px;background:rgba(255,68,68,.08);border:1px solid rgba(255,68,68,.25);color:var(--error);font-size:13px;"></div>
+            <div id="modalSuccess" style="display:none;margin-bottom:16px;padding:10px 14px;border-radius:8px;background:rgba(0,232,122,.08);border:1px solid rgba(0,232,122,.25);color:var(--success);font-size:13px;"></div>
+
+            <input type="hidden" id="f_id">
+
+            <form autocomplete="off" onsubmit="event.preventDefault(); saveSupplier();">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Business Name *</label>
+                    <input type="text" id="f_name" placeholder="e.g. Westlands Gas Depot" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label>Phone *</label>
+                    <input type="tel" id="f_phone" placeholder="e.g. 0712 345 678" autocomplete="off">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="f_email" placeholder="supplier@example.com" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label>Location / Area</label>
+                    <input type="text" id="f_location" placeholder="e.g. Westlands, Nairobi" autocomplete="off">
+                </div>
+            </div>
+            <div class="form-row-3">
+                <div class="form-group">
+                    <label>Delivery Radius (km)</label>
+                    <input type="number" id="f_radius" placeholder="5" min="1" max="50" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label>Delivery Time (min)</label>
+                    <input type="number" id="f_time" placeholder="30" min="5" max="300" autocomplete="off">
+                </div>
+                <div class="form-group" id="pinGroup">
+                    <label id="pinLabel">PIN *</label>
+                    <input type="password" id="f_pin" placeholder="4–6 digits" maxlength="6" inputmode="numeric" autocomplete="new-password">
+                </div>
+            </div>
+            <div class="form-row" id="pinConfirmRow">
+                <div class="form-group">
+                    <label id="pinConfirmLabel">Confirm PIN *</label>
+                    <input type="password" id="f_pinConfirm" placeholder="Repeat PIN" maxlength="6" inputmode="numeric" autocomplete="new-password">
+                </div>
+                <div></div>
+            </div>
+
+            <div class="modal-actions">
+                <button type="submit" class="btn-primary" id="saveBtn" style="flex:1;">Save Supplier</button>
+                <button type="button" class="btn-secondary" onclick="closeModal()" style="flex:1;">Cancel</button>
+            </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ── DELETE CONFIRM ──────────────────────────────────────── -->
+    <div class="modal" id="deleteModal">
+        <div class="modal-content" style="max-width:420px;">
+            <div class="modal-header">
+                <h2>Delete Supplier</h2>
+                <button class="close-btn" onclick="closeDeleteModal()">×</button>
+            </div>
+            <p style="color:var(--text2);margin:16px 0;font-size:14px;line-height:1.6;">
+                Permanently delete <strong id="deleteSupplierName"></strong>? This cannot be undone and will remove all associated data.
+            </p>
+            <div class="modal-actions">
+                <button class="btn-primary" id="confirmDeleteBtn" style="flex:1;background:var(--error);" onclick="confirmDelete()">Delete Permanently</button>
+                <button class="btn-secondary" onclick="closeDeleteModal()" style="flex:1;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+    let currentPage = 1;
+    const PAGE_SIZE  = 10;
+    let deleteId     = null;
+    let isEditing    = false;
+
+    // ── Utilities ─────────────────────────────────────────────────────────────
+    function esc(s) {
+        return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function toast(msg, type = 'success') {
+        const el = document.getElementById('toast');
+        el.textContent = msg;
+        el.className = `toast ${type}`;
+        el.classList.add('show');
+        setTimeout(() => el.classList.remove('show'), 3000);
+    }
+    function modalAlert(msg) {
+        const el = document.getElementById('modalAlert');
+        el.textContent = msg; el.style.display = 'block';
+        document.getElementById('modalSuccess').style.display = 'none';
+    }
+    function modalOk(msg) {
+        const el = document.getElementById('modalSuccess');
+        el.textContent = msg; el.style.display = 'block';
+        document.getElementById('modalAlert').style.display = 'none';
+    }
+    function clearModalAlerts() {
+        document.getElementById('modalAlert').style.display = 'none';
+        document.getElementById('modalSuccess').style.display = 'none';
+    }
+
+    // ── Summary ───────────────────────────────────────────────────────────────
+    function updateSummary(s) {
+        document.getElementById('sTotal').textContent    = s.total    ?? 0;
+        document.getElementById('sPending').textContent  = s.pending  ?? 0;
+        document.getElementById('sApproved').textContent = s.approved ?? 0;
+        document.getElementById('sRejected').textContent = s.rejected ?? 0;
+        document.getElementById('sVerified').textContent = s.verified ?? 0;
+    }
+
+    // ── Load ──────────────────────────────────────────────────────────────────
+    function resetAndLoad() { currentPage = 1; loadSuppliers(); }
+
+    async function loadSuppliers() {
+        const status = document.getElementById('statusFilter').value;
+        const search = document.getElementById('searchInput').value.trim();
+        const params = new URLSearchParams({ page: currentPage, limit: PAGE_SIZE });
+        if (status) params.set('status', status);
+        if (search) params.set('search', search);
+
+        document.getElementById('tableBody').innerHTML =
+            '<tr><td colspan="7" class="loading"><div class="loading-spinner"></div>Loading…</td></tr>';
+
+        try {
+            const r = await authFetch(`/api/admin/suppliers?${params}`);
+            if (!r.ok) {
+                if (r.status === 401) { window.location.href = 'login.html'; return; }
+                const d = await r.json().catch(() => ({}));
+                document.getElementById('tableBody').innerHTML =
+                    `<tr><td colspan="7" style="text-align:center;padding:48px;color:var(--error);">Error ${r.status}: ${esc(d.error || 'Unknown error')}</td></tr>`;
+                return;
+            }
+            const d = await r.json();
+            updateSummary(d.summary || {});
+            renderTable(d.suppliers || []);
+            renderPagination(d.total || 0);
+        } catch (e) {
+            console.error('[suppliers]', e);
+            document.getElementById('tableBody').innerHTML =
+                '<tr><td colspan="7" style="text-align:center;padding:48px;color:var(--error);">Network error. Please refresh.</td></tr>';
+        }
+    }
+
+    function renderTable(rows) {
+        const tbody = document.getElementById('tableBody');
+        if (!rows.length) {
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:48px;color:var(--text2);">No suppliers found. <a href="#" onclick="openCreateModal()" style="color:var(--accent);">Add the first →</a></td></tr>`;
+            return;
+        }
+        tbody.innerHTML = rows.map(s => {
+            const statusActions = [];
+            if (s.status === 'pending') {
+                statusActions.push(`<button class="btn-action btn-approve" onclick="setStatus('${s.id}','approved','${esc(s.name)}')">Approve</button>`);
+                statusActions.push(`<button class="btn-action btn-reject"  onclick="setStatus('${s.id}','rejected','${esc(s.name)}')">Reject</button>`);
+            } else if (s.status === 'approved') {
+                statusActions.push(`<button class="btn-action btn-reject" onclick="setStatus('${s.id}','suspended','${esc(s.name)}')">Suspend</button>`);
+            } else if (s.status === 'suspended' || s.status === 'rejected') {
+                statusActions.push(`<button class="btn-action btn-approve" onclick="setStatus('${s.id}','approved','${esc(s.name)}')">Re-approve</button>`);
+            }
+
+            return `
+                <tr>
+                    <td>
+                        <div style="font-weight:600;">${esc(s.name)}</div>
+                        <div class="supplier-meta">${s.verified ? '<span style="color:var(--success);">✓ Verified</span>' : '<span style="color:var(--text2);">Unverified</span>'}</div>
+                    </td>
+                    <td>
+                        <div>${esc(s.phone)}</div>
+                        <div class="supplier-meta">${esc(s.email || '—')}</div>
+                    </td>
+                    <td style="color:var(--text2);">${esc(s.location || '—')}</td>
+                    <td>
+                        ${s.onboarding_ref
+                            ? `<span class="ref-badge">${esc(s.onboarding_ref)}</span>`
+                            : '<span style="color:var(--text2);font-size:12px;">Direct</span>'}
+                    </td>
+                    <td style="font-size:12px;color:var(--text2);">
+                        ${s.base_price_6kg  ? `6kg: KSh ${Number(s.base_price_6kg).toLocaleString()}<br>` : ''}
+                        ${s.base_price_13kg ? `13kg: KSh ${Number(s.base_price_13kg).toLocaleString()}` : '—'}
+                    </td>
+                    <td><span class="status-badge status-${esc(s.status)}">${esc(s.status)}</span></td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn-action btn-edit"   onclick="openEditModal(${esc(JSON.stringify(s))})">Edit</button>
+                            ${statusActions.join('')}
+                            <button class="btn-action btn-delete" onclick="openDeleteModal('${s.id}','${esc(s.name)}')">Delete</button>
+                        </div>
+                    </td>
+                </tr>`;
+        }).join('');
+    }
+
+    function renderPagination(total) {
+        const pages = Math.ceil(total / PAGE_SIZE);
+        const el = document.getElementById('pagination');
+        if (pages <= 1) { el.innerHTML = ''; return; }
+        el.innerHTML = Array.from({ length: pages }, (_, i) =>
+            `<button class="page-btn${i+1===currentPage?' active':''}" onclick="goPage(${i+1})">${i+1}</button>`
+        ).join('');
+    }
+    function goPage(n) { currentPage = n; loadSuppliers(); }
+
+    // ── Status update ─────────────────────────────────────────────────────────
+    async function setStatus(id, status, name) {
+        if (!confirm(`${status === 'suspended' ? 'Suspend' : status.charAt(0).toUpperCase()+status.slice(1)} "${name}"?`)) return;
+        try {
+            const r = await authFetch('/api/admin/suppliers', {
+                method: 'PUT',
+                body: JSON.stringify({ supplierId: id, status })
+            });
+            const d = await r.json();
+            if (r.ok && d.success) { toast(`Supplier ${status}`); loadSuppliers(); }
+            else toast(d.error || 'Update failed', 'error');
+        } catch (e) { toast('Network error', 'error'); }
+    }
+
+    // ── Create modal ──────────────────────────────────────────────────────────
+    function openCreateModal() {
+        isEditing = false;
+        document.getElementById('modalTitle').textContent = 'Add Supplier';
+        document.getElementById('f_id').value = '';
+        document.getElementById('pinLabel').textContent = 'PIN *';
+        document.getElementById('pinConfirmLabel').textContent = 'Confirm PIN *';
+        document.getElementById('pinConfirmRow').style.display = '';
+        clearModalAlerts();
+        ['f_name','f_phone','f_email','f_location','f_pin','f_pinConfirm'].forEach(id => document.getElementById(id).value = '');
+        document.getElementById('f_radius').value = '5';
+        document.getElementById('f_time').value   = '30';
+        document.getElementById('saveBtn').textContent = 'Add Supplier';
+        document.getElementById('supplierModal').classList.add('active');
+        setTimeout(() => document.getElementById('f_name').focus(), 80);
+    }
+
+    // ── Edit modal ────────────────────────────────────────────────────────────
+    function openEditModal(s) {
+        isEditing = true;
+        document.getElementById('modalTitle').textContent = 'Edit Supplier';
+        document.getElementById('f_id').value       = s.id;
+        document.getElementById('f_name').value     = s.name    || '';
+        document.getElementById('f_phone').value    = s.phone   || '';
+        document.getElementById('f_email').value    = s.email   || '';
+        document.getElementById('f_location').value = s.location || '';
+        document.getElementById('f_radius').value   = s.delivery_radius_km || 5;
+        document.getElementById('f_time').value     = s.delivery_time_min  || 30;
+        document.getElementById('f_pin').value         = '';
+        document.getElementById('f_pinConfirm').value  = '';
+        document.getElementById('pinLabel').textContent = 'New PIN (optional)';
+        document.getElementById('pinConfirmLabel').textContent = 'Confirm New PIN';
+        clearModalAlerts();
+        document.getElementById('saveBtn').textContent = 'Save Changes';
+        document.getElementById('supplierModal').classList.add('active');
+        setTimeout(() => document.getElementById('f_name').focus(), 80);
+    }
+
+    function closeModal() {
+        document.getElementById('supplierModal').classList.remove('active');
+    }
+
+    // ── Save (create or edit) ─────────────────────────────────────────────────
+    async function saveSupplier() {
+        clearModalAlerts();
+        const id         = document.getElementById('f_id').value;
+        const name       = document.getElementById('f_name').value.trim();
+        const phone      = document.getElementById('f_phone').value.trim();
+        const email      = document.getElementById('f_email').value.trim();
+        const location   = document.getElementById('f_location').value.trim();
+        const radius     = document.getElementById('f_radius').value;
+        const time       = document.getElementById('f_time').value;
+        const pin        = document.getElementById('f_pin').value;
+        const pinConfirm = document.getElementById('f_pinConfirm').value;
+
+        if (!name)  { modalAlert('Business name is required'); return; }
+        if (!phone) { modalAlert('Phone number is required');  return; }
+        if (!isEditing && !pin)          { modalAlert('PIN is required');                return; }
+        if (!isEditing && pin.length < 4){ modalAlert('PIN must be at least 4 digits'); return; }
+        if (pin && pin !== pinConfirm)    { modalAlert('PINs do not match');             return; }
+        if (pin && pin.length < 4)        { modalAlert('PIN must be at least 4 digits'); return; }
+
+        const btn = document.getElementById('saveBtn');
+        btn.disabled = true; btn.textContent = 'Saving…';
+
+        const body = { name, phone, email: email||undefined, location: location||undefined,
+                       delivery_radius_km: radius ? Number(radius) : undefined,
+                       delivery_time_min:  time   ? Number(time)   : undefined };
+        if (pin) body.pin = pin;
+
+        try {
+            let r, d;
+            if (isEditing) {
+                body.supplierId = id;
+                r = await authFetch('/api/admin/suppliers', { method: 'PATCH', body: JSON.stringify(body) });
+            } else {
+                r = await authFetch('/api/admin/suppliers', { method: 'POST',  body: JSON.stringify(body) });
+            }
+            d = await r.json();
+            if (r.ok && d.success) {
+                modalOk(isEditing ? 'Supplier updated.' : `Supplier "${d.supplier?.name}" created.`);
+                btn.disabled = false; btn.textContent = isEditing ? 'Save Changes' : 'Add Supplier';
+                loadSuppliers();
+            } else {
+                modalAlert(d.error || 'Failed to save');
+                btn.disabled = false; btn.textContent = isEditing ? 'Save Changes' : 'Add Supplier';
+            }
+        } catch (e) {
+            modalAlert('Network error. Please try again.');
+            btn.disabled = false; btn.textContent = isEditing ? 'Save Changes' : 'Add Supplier';
+        }
+    }
+
+    // ── Delete ────────────────────────────────────────────────────────────────
+    function openDeleteModal(id, name) {
+        deleteId = id;
+        document.getElementById('deleteSupplierName').textContent = name;
+        document.getElementById('deleteModal').classList.add('active');
+    }
+    function closeDeleteModal() {
+        document.getElementById('deleteModal').classList.remove('active');
+        deleteId = null;
+    }
+    async function confirmDelete() {
+        if (!deleteId) return;
+        const btn = document.getElementById('confirmDeleteBtn');
+        btn.disabled = true; btn.textContent = 'Deleting…';
+        try {
+            const r = await authFetch('/api/admin/suppliers', {
+                method: 'DELETE', body: JSON.stringify({ supplierId: deleteId })
+            });
+            const d = await r.json();
+            if (r.ok && d.success) { toast('Supplier deleted'); closeDeleteModal(); loadSuppliers(); }
+            else toast(d.error || 'Delete failed', 'error');
+        } catch (e) { toast('Network error', 'error'); }
+        finally { btn.disabled = false; btn.textContent = 'Delete Permanently'; }
+    }
+
+    loadSuppliers();
+    </script>
+</body>
+</html>

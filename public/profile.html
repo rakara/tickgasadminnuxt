@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile — TickGas Admin</title>
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="/css/admin.css">
+    <link rel="icon" type="image/png" href="/icons/favicon.png">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0a0a0a">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <script src="/js/api.js"></script>
+    <script src="/js/sidebar.js"></script>
+    <style>
+        .profile-grid {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 24px;
+            align-items: start;
+        }
+
+        /* ── Identity card ── */
+        .identity-card {
+            background: var(--bg1);
+            border: 1px solid var(--border);
+            border-radius: var(--r-xl);
+            padding: 32px 24px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            gap: 12px;
+        }
+        .profile-avatar {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            background: var(--gradient);
+            color: #000;
+            font-weight: 800;
+            font-size: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 4px;
+        }
+        .profile-name {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text1);
+        }
+        .profile-email {
+            font-size: 13px;
+            color: var(--text2);
+            word-break: break-all;
+        }
+        .profile-role-badge {
+            display: inline-block;
+            background: var(--gradient);
+            color: #000;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 4px 12px;
+            border-radius: 100px;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+        .profile-meta {
+            font-size: 12px;
+            color: var(--text2);
+            margin-top: 4px;
+            line-height: 1.7;
+        }
+
+        /* ── Logout button on identity card ── */
+        .btn-logout {
+            width: 100%;
+            margin-top: 8px;
+            padding: 12px;
+            background: rgba(255, 68, 68, 0.08);
+            border: 1px solid rgba(255, 68, 68, 0.25);
+            border-radius: var(--r-md);
+            color: var(--error);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background .15s, border-color .15s;
+            font-family: inherit;
+        }
+        .btn-logout:hover {
+            background: rgba(255, 68, 68, 0.15);
+            border-color: rgba(255, 68, 68, 0.5);
+        }
+
+        /* ── Details panel ── */
+        .details-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .panel-card {
+            background: var(--bg1);
+            border: 1px solid var(--border);
+            border-radius: var(--r-xl);
+            overflow: hidden;
+        }
+        .panel-header {
+            padding: 18px 24px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .panel-header h2 {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text1);
+        }
+        .panel-body { padding: 24px; }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+            gap: 16px;
+        }
+        .detail-row:last-child { border-bottom: none; }
+        .detail-label {
+            font-size: 13px;
+            color: var(--text2);
+            font-weight: 500;
+            flex-shrink: 0;
+        }
+        .detail-value {
+            font-size: 13px;
+            color: var(--text1);
+            text-align: right;
+            font-family: var(--mono);
+            word-break: break-all;
+        }
+
+        /* ── Change password form ── */
+        .pw-form { display: flex; flex-direction: column; gap: 16px; }
+        .pw-form .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        .alert-box {
+            padding: 10px 14px;
+            border-radius: var(--r-sm);
+            font-size: 13px;
+            display: none;
+        }
+        .alert-box.error   { background: rgba(255,68,68,.08);  border: 1px solid rgba(255,68,68,.25);  color: var(--error); }
+        .alert-box.success { background: rgba(0,232,122,.08); border: 1px solid rgba(0,232,122,.25); color: var(--success); }
+        .alert-box.show    { display: block; }
+
+        /* ── Session info ── */
+        .session-warning {
+            background: rgba(255, 170, 0, 0.07);
+            border: 1px solid rgba(255, 170, 0, 0.2);
+            border-radius: var(--r-md);
+            padding: 12px 16px;
+            font-size: 13px;
+            color: var(--warning);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        @media (max-width: 900px) {
+            .profile-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <script>if (!requireAuth()) throw new Error('redirect');</script>
+    <script>renderSidebar('profile');</script>
+
+    <div class="container">
+        <div class="main">
+            <div class="header">
+                <div>
+                    <h1>My Profile</h1>
+                    <div class="date" id="pageDate"></div>
+                </div>
+            </div>
+
+            <div class="profile-grid">
+
+                <!-- ── Left: Identity card ── -->
+                <div>
+                    <div class="identity-card">
+                        <div class="profile-avatar" id="avatarLetter">A</div>
+                        <div class="profile-name"   id="profileName">—</div>
+                        <div class="profile-email"  id="profileEmail">—</div>
+                        <div class="profile-role-badge">Administrator</div>
+                        <div class="profile-meta" id="sessionMeta"></div>
+
+                        <button class="btn-logout" onclick="confirmLogout()">
+                            Sign Out of Admin Panel
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ── Right: Details + actions ── -->
+                <div class="details-panel">
+
+                    <!-- Account details -->
+                    <div class="panel-card">
+                        <div class="panel-header">
+                            <h2>Account Details</h2>
+                        </div>
+                        <div class="panel-body">
+                            <div class="detail-row">
+                                <span class="detail-label">Email</span>
+                                <span class="detail-value" id="detailEmail">—</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Role</span>
+                                <span class="detail-value">admin</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Token expires</span>
+                                <span class="detail-value" id="detailExpiry">—</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Token issued</span>
+                                <span class="detail-value" id="detailIssued">—</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Change password -->
+                    <div class="panel-card">
+                        <div class="panel-header">
+                            <h2>Change Password</h2>
+                        </div>
+                        <div class="panel-body">
+                            <div class="alert-box error"   id="pwAlert"></div>
+                            <div class="alert-box success" id="pwSuccess"></div>
+                            <form class="pw-form" autocomplete="off"
+                                  onsubmit="event.preventDefault(); changePassword();">
+                                <div class="form-group">
+                                    <label>Current Password</label>
+                                    <input type="password" id="pwCurrent"
+                                           placeholder="Enter current password"
+                                           autocomplete="current-password">
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>New Password</label>
+                                        <input type="password" id="pwNew"
+                                               placeholder="Min 8 characters"
+                                               autocomplete="new-password">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Confirm New Password</label>
+                                        <input type="password" id="pwConfirm"
+                                               placeholder="Repeat new password"
+                                               autocomplete="new-password">
+                                    </div>
+                                </div>
+                                <div>
+                                    <button type="submit" class="btn-primary"
+                                            id="pwBtn" style="min-width:160px;">
+                                        Update Password
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Session info -->
+                    <div class="panel-card">
+                        <div class="panel-header"><h2>Session</h2></div>
+                        <div class="panel-body">
+                            <div id="sessionWarning" style="display:none;" class="session-warning">
+                                ⚠ Your session expires soon. Save your work and log in again.
+                            </div>
+                            <div class="detail-row" style="border:none;padding-top:0;">
+                                <span class="detail-label">All admin sessions use 7-day JWT tokens.<br>
+                                Closing this browser does not invalidate the session.</span>
+                            </div>
+                            <button class="btn-logout" style="margin-top:12px;"
+                                    onclick="confirmLogout()">
+                                Sign Out &amp; Clear Session
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Logout confirm modal -->
+    <div class="modal" id="logoutModal">
+        <div class="modal-content" style="max-width:400px;">
+            <div class="modal-header">
+                <h2>Sign Out?</h2>
+                <button class="close-btn" onclick="document.getElementById('logoutModal').classList.remove('active')">×</button>
+            </div>
+            <p style="color:var(--text2);font-size:14px;margin:12px 0 20px;line-height:1.6;">
+                This will clear your session and all local storage. You'll need to log in again to access the admin panel.
+            </p>
+            <div class="modal-actions">
+                <button class="btn-primary" style="flex:1;background:var(--error);"
+                        onclick="doLogout()">Yes, Sign Out</button>
+                <button class="btn-secondary" style="flex:1;"
+                        onclick="document.getElementById('logoutModal').classList.remove('active')">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+    // ── Populate page from stored admin data + JWT ─────────────────────────────
+    const admin = JSON.parse(localStorage.getItem('admin') || '{}');
+    const token = localStorage.getItem('adminToken');
+
+    const email  = admin.email || '—';
+    const handle = email.includes('@') ? email.split('@')[0] : email;
+
+    document.getElementById('avatarLetter').textContent = handle.charAt(0).toUpperCase();
+    document.getElementById('profileName').textContent  = handle;
+    document.getElementById('profileEmail').textContent = email;
+    document.getElementById('detailEmail').textContent  = email;
+    document.getElementById('pageDate').textContent = new Date().toLocaleDateString('en-KE', {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    });
+
+    // Decode JWT to show issued/expiry times
+    if (token) {
+        try {
+            const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+            const fmt = ts => new Date(ts * 1000).toLocaleString('en-KE', {
+                day: 'numeric', month: 'short', year: 'numeric',
+                hour: '2-digit', minute: '2-digit'
+            });
+            if (payload.exp) {
+                document.getElementById('detailExpiry').textContent = fmt(payload.exp);
+                // Warn if expiring within 24 hours
+                if (payload.exp * 1000 - Date.now() < 86400000) {
+                    document.getElementById('sessionWarning').style.display = 'flex';
+                }
+            }
+            if (payload.iat) {
+                document.getElementById('detailIssued').textContent = fmt(payload.iat);
+                document.getElementById('sessionMeta').textContent =
+                    'Session started ' + new Date(payload.iat * 1000).toLocaleDateString('en-KE',
+                    { day:'numeric', month:'short', year:'numeric' });
+            }
+        } catch (e) {
+            document.getElementById('detailExpiry').textContent = 'Unable to decode token';
+        }
+    }
+
+    // ── Change password ────────────────────────────────────────────────────────
+    async function changePassword() {
+        const current = document.getElementById('pwCurrent').value;
+        const newPw   = document.getElementById('pwNew').value;
+        const confirm = document.getElementById('pwConfirm').value;
+        const alertEl = document.getElementById('pwAlert');
+        const okEl    = document.getElementById('pwSuccess');
+
+        alertEl.classList.remove('show'); okEl.classList.remove('show');
+
+        if (!current)          { alertEl.textContent = 'Current password is required'; alertEl.classList.add('show'); return; }
+        if (!newPw)            { alertEl.textContent = 'New password is required';     alertEl.classList.add('show'); return; }
+        if (newPw.length < 8)  { alertEl.textContent = 'Password must be at least 8 characters'; alertEl.classList.add('show'); return; }
+        if (newPw !== confirm)  { alertEl.textContent = 'Passwords do not match';      alertEl.classList.add('show'); return; }
+
+        const btn = document.getElementById('pwBtn');
+        btn.disabled = true; btn.textContent = 'Updating…';
+
+        try {
+            const r = await authFetch('/api/admin/profile/password', {
+                method: 'PUT',
+                body: JSON.stringify({ currentPassword: current, newPassword: newPw })
+            });
+            const d = await r.json();
+            if (r.ok && d.success) {
+                okEl.textContent = 'Password updated successfully.';
+                okEl.classList.add('show');
+                document.getElementById('pwCurrent').value = '';
+                document.getElementById('pwNew').value     = '';
+                document.getElementById('pwConfirm').value = '';
+            } else {
+                alertEl.textContent = d.error || 'Failed to update password';
+                alertEl.classList.add('show');
+            }
+        } catch (e) {
+            alertEl.textContent = 'Network error. Please try again.';
+            alertEl.classList.add('show');
+        } finally {
+            btn.disabled = false; btn.textContent = 'Update Password';
+        }
+    }
+
+    // ── Logout ─────────────────────────────────────────────────────────────────
+    function confirmLogout() {
+        document.getElementById('logoutModal').classList.add('active');
+    }
+    function doLogout() {
+        logout(); // from api.js — clears all storage and redirects
+    }
+
+    function toast(msg, type = 'success') {
+        const el = document.getElementById('toast');
+        el.textContent = msg; el.className = `toast ${type}`; el.classList.add('show');
+        setTimeout(() => el.classList.remove('show'), 3000);
+    }
+    </script>
+</body>
+</html>

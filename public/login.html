@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login - TickGas</title>
+    <link rel="icon" type="image/png" href="/icons/favicon.png">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0a0a0a">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
+      }
+    </script>
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="/css/admin.css">
+    <link rel="stylesheet" href="/css/auth.css">
+</head>
+<body class="auth-page">
+    <div class="auth-container">
+        <div class="auth-logo">🔥 TickGas</div>
+        <div class="auth-subtitle">Admin Panel</div>
+
+        <div id="errorMessage" class="error-message"></div>
+
+        <div class="input-group">
+            <label class="input-label">Email</label>
+            <input type="email" id="adminEmail" class="auth-input" placeholder="admin@tickgas.com"
+                onkeydown="if(event.key==='Enter') handleAdminLogin()">
+        </div>
+        <div class="input-group">
+            <label class="input-label">Password</label>
+            <input type="password" id="adminPassword" class="auth-input" placeholder="Enter password"
+                onkeydown="if(event.key==='Enter') handleAdminLogin()">
+        </div>
+        <button class="btn-primary" id="loginBtn" onclick="handleAdminLogin()">Log In</button>
+    </div>
+
+    <script>
+    // Login page uses plain fetch — no token exists yet
+    async function handleAdminLogin() {
+        const email    = document.getElementById('adminEmail').value.trim();
+        const password = document.getElementById('adminPassword').value.trim();
+        if (!email || !password) { showError('Please enter email and password'); return; }
+
+        const btn = document.getElementById('loginBtn');
+        btn.disabled = true; btn.textContent = 'Logging in...';
+
+        try {
+            const r = await fetch('/api/admin/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+            const d = await r.json();
+            if (r.ok && d.success) {
+                localStorage.setItem('admin', JSON.stringify(d.admin));
+                localStorage.setItem('adminToken', d.token);
+                window.location.href = 'dashboard.html';
+            } else {
+                showError(d.error || 'Invalid credentials');
+            }
+        } catch(e) {
+            console.error('Login error:', e);
+            showError('Network error. Please try again.');
+        } finally {
+            btn.disabled = false; btn.textContent = 'Log In';
+        }
+    }
+
+    function showError(msg) {
+        const el = document.getElementById('errorMessage');
+        el.textContent = msg; el.classList.add('show');
+    }
+    </script>
+</body>
+</html>

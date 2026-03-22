@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Orders - TickGas Admin</title>
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="/css/admin.css">
+    <link rel="icon" type="image/png" href="/icons/favicon.png">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0a0a0a">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    
+    
+    <script src="/js/api.js"></script>
+    <script src="/js/sidebar.js"></script>
+</head>
+<body>
+    <script>if (!requireAuth()) throw new Error("redirect");</script>
+    <script>renderSidebar('orders');</script>
+    <div class="container">
+
+        <div class="main">
+            <div class="header">
+                <h1>Order Management</h1>
+                <div class="header-controls">
+                    <button class="refresh-btn" onclick="loadOrders()">
+                        <span>↻</span> Refresh
+                    </button>
+                </div>
+            </div>
+
+            <div class="error-message" id="errorMessage">
+                <span>⚠️</span>
+                <span id="errorText"></span>
+            </div>
+
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="stat-label">Total Orders</div>
+                    <div class="stat-value" id="totalOrders">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Today's Orders</div>
+                    <div class="stat-value" id="todayOrders">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Pending</div>
+                    <div class="stat-value" id="pendingOrders">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Completed</div>
+                    <div class="stat-value" id="completedOrders">0</div>
+                </div>
+            </div>
+
+            <div class="filters">
+                <select class="filter-select" id="statusFilter" onchange="loadOrders()">
+                    <option value="">All Statuses</option>
+                    <option value="pending">Pending</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="processing">Processing</option>
+                    <option value="out_for_delivery">Out for Delivery</option>
+                    <option value="delivered">Delivered</option>
+                    <option value="cancelled">Cancelled</option>
+                </select>
+                
+                <select class="filter-select" id="supplierFilter" onchange="loadOrders()">
+                    <option value="">All Suppliers</option>
+                </select>
+                
+                <input type="date" class="date-input" id="dateFilter" onchange="loadOrders()">
+                <input type="text" class="search-box" id="searchInput" placeholder="Search by order ID or customer..." onkeyup="debounceLoad()">
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Order ID</th>
+                            <th>Date</th>
+                            <th>Customer</th>
+                            <th>Supplier</th>
+                            <th>Amount</th>
+                            <th>Status</th>
+                            <th>Payment</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ordersTableBody">
+                        <tr>
+                            <td colspan="8" class="loading">
+                                <div class="loading-spinner"></div>
+                                Loading orders...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="pagination" id="pagination"></div>
+        </div>
+    </div>
+
+    <!-- Order Details Modal -->
+    <div class="modal" id="orderModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Order Details</h2>
+                <button class="close-btn" onclick="closeModal()">&times;</button>
+            </div>
+            <div id="orderDetails"></div>
+            <select class="status-select" id="updateStatus">
+                <option value="pending">Pending</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="processing">Processing</option>
+                <option value="out_for_delivery">Out for Delivery</option>
+                <option value="delivered">Delivered</option>
+                <option value="cancelled">Cancelled</option>
+            </select>
+            <div style="display: flex; gap: 12px;">
+                <button class="btn-primary" style="flex:1;" onclick="updateOrderStatus()">Update Status</button>
+                <button class="btn-secondary" style="flex:1;" onclick="closeModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast">Action completed successfully</div>
+
+    <script>
+        let currentPage = 1;
+        let totalPages = 1;
+        let totalRecords = 0;
+        const limit = 15;
+        let debounceTimer;
+        let selectedOrder = null;
+
+        function showError(message) {
+            const errorEl = document.getElementById('errorMessage');
+            document.getElementById('errorText').textContent = message;
+            errorEl.classList.add('show');
+            setTimeout(() => errorEl.classList.remove('show'), 5000);
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast ${type === 'error' ? 'error' : ''}`;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        function debounceLoad() {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(loadOrders, 500);
+        }
+
+        async function loadSuppliers() {
+            try {
+                const response = await authFetch('/api/admin/suppliers?status=approved&limit=200');
+                if (!response.ok) return;
+                const data = await response.json();
+                
+                const select = document.getElementById('supplierFilter');
+                if (data.suppliers) {
+                    select.innerHTML = '<option value="">All Suppliers</option>' + 
+                        data.suppliers.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+                }
+            } catch (error) {
+                console.error('Error loading suppliers:', error);
+            }
+        }
+
+        async function loadOrders() {
+            const status = document.getElementById('statusFilter').value;
+            const supplier = document.getElementById('supplierFilter').value;
+            const date = document.getElementById('dateFilter').value;
+            const search = document.getElementById('searchInput').value;
+
+            try {
+                console.log('🔍 Loading orders with params:', { status, supplier, date, search, page: currentPage });
+                
+                const response = await authFetch(
+                    `/api/admin/orders?status=${status}&supplierId=${supplier}&date=${date}&search=${encodeURIComponent(search)}&page=${currentPage}&limit=${limit}`
+                );
+                
+                const data = await response.json();
+                console.log('📦 Orders response:', data);
+                
+                if (data.orders) {
+                    renderOrders(data.orders);
+                    updateStats(data.stats);
+                    renderPagination(data.total);
+                } else {
+                    throw new Error('No orders data');
+                }
+            } catch (error) {
+                console.error('❌ Error loading orders:', error);
+                showError('Failed to load orders');
+            }
+        }
+
+        function renderOrders(orders) {
+            const tbody = document.getElementById('ordersTableBody');
+            
+            if (!orders || orders.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><div class="empty-icon">📦</div>No orders found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = orders.map(order => {
+                const orderNumber = order.order_number || order.id.slice(0, 8);
+                const customerName = order.users?.name || 'N/A';
+                const customerPhone = order.users?.phone || '';
+                const supplierName = order.suppliers?.name || 'N/A';
+                const amount = order.total_amount || 0;
+                const status = order.status || 'pending';
+                const paymentStatus = order.payment_status || 'pending';
+                
+                return `
+                <tr>
+                    <td><strong>#${orderNumber}</strong></td>
+                    <td>${new Date(order.created_at).toLocaleDateString()}</td>
+                    <td>
+                        ${customerName}<br>
+                        <small style="color: #a0a0a0;">${customerPhone}</small>
+                    </td>
+                    <td>${supplierName}</td>
+                    <td>KSh ${amount.toLocaleString()}</td>
+                    <td><span class="status-badge status-${status}">${status.replace('_', ' ')}</span></td>
+                    <td><span class="status-badge status-${paymentStatus}">${paymentStatus}</span></td>
+                    <td>
+                        <button class="action-btn" onclick="viewOrder('${order.id}')">View</button>
+                    </td>
+                </tr>
+            `}).join('');
+        }
+
+        function updateStats(stats) {
+            if (!stats) return;
+            
+            document.getElementById('totalOrders').textContent = stats.total || 0;
+            document.getElementById('todayOrders').textContent = stats.today || 0;
+            document.getElementById('pendingOrders').textContent = stats.pending || 0;
+            document.getElementById('completedOrders').textContent = stats.completed || 0;
+        }
+
+        function renderPagination(total) {
+            totalRecords = total;
+            totalPages = Math.ceil(total / limit);
+            const pagination = document.getElementById('pagination');
+            
+            if (totalPages <= 1) {
+                pagination.innerHTML = '';
+                return;
+            }
+            
+            let html = '';
+            
+            html += `<button class="page-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="changePage(${currentPage - 1})">←</button>`;
+            
+            for (let i = 1; i <= totalPages; i++) {
+                if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
+                    html += `<button class="page-btn ${i === currentPage ? 'active' : ''}" onclick="changePage(${i})">${i}</button>`;
+                } else if (i === currentPage - 3 || i === currentPage + 3) {
+                    html += `<span class="page-btn" style="background:transparent; border:none; cursor:default;">...</span>`;
+                }
+            }
+            
+            html += `<button class="page-btn" ${currentPage === totalPages ? 'disabled' : ''} onclick="changePage(${currentPage + 1})">→</button>`;
+            html += `<span class="page-info">Page ${currentPage} of ${totalPages} (${totalRecords} records)</span>`;
+            
+            pagination.innerHTML = html;
+        }
+
+        function changePage(page) {
+            if (page < 1 || page > totalPages) return;
+            currentPage = page;
+            loadOrders();
+        }
+
+        async function viewOrder(orderId) {
+            try {
+                const response = await authFetch(`/api/admin/orders/${orderId}`);
+                const data = await response.json();
+                
+                if (data.order) {
+                    selectedOrder = data.order;
+                    showOrderDetails(data.order);
+                } else {
+                    throw new Error('Order not found');
+                }
+            } catch (error) {
+                console.error('❌ Error loading order:', error);
+                showToast('Failed to load order details', 'error');
+            }
+        }
+
+        function showOrderDetails(order) {
+            const details = document.getElementById('orderDetails');
+            
+            const receiptNumber = order.mpesa_transactions?.[0]?.mpesa_receipt_number || 'N/A';
+            const orderDate = new Date(order.created_at).toLocaleString();
+            
+            details.innerHTML = `
+                <div class="detail-row">
+                    <span class="detail-label">Order ID:</span>
+                    <span class="detail-value">#${order.order_number || order.id}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Customer:</span>
+                    <span class="detail-value">${order.users?.name || 'N/A'}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Phone:</span>
+                    <span class="detail-value">${order.users?.phone || 'N/A'}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Supplier:</span>
+                    <span class="detail-value">${order.suppliers?.name || 'N/A'}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Gas Size:</span>
+                    <span class="detail-value">${order.gas_size}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Amount:</span>
+                    <span class="detail-value">KSh ${(order.total_amount || 0).toLocaleString()}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Delivery Address:</span>
+                    <span class="detail-value">${order.delivery_address}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Status:</span>
+                    <span class="detail-value">${order.status}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Payment:</span>
+                    <span class="detail-value">${order.payment_status}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">M-PESA Receipt:</span>
+                    <span class="detail-value">${receiptNumber}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Order Date:</span>
+                    <span class="detail-value">${orderDate}</span>
+                </div>
+            `;
+            
+            document.getElementById('updateStatus').value = order.status;
+            document.getElementById('orderModal').classList.add('active');
+        }
+
+        async function updateOrderStatus() {
+            const newStatus = document.getElementById('updateStatus').value;
+            
+            if (!selectedOrder) return;
+            
+            try {
+                const response = await authFetch('/api/admin/orders', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        orderId: selectedOrder.id,
+                        status: newStatus
+                    })
+                });
+
+                if (response.ok) {
+                    showToast('Order status updated');
+                    closeModal();
+                    loadOrders();
+                } else {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Update failed');
+                }
+            } catch (error) {
+                console.error('❌ Error updating order:', error);
+                showToast('Failed to update order status', 'error');
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('orderModal').classList.remove('active');
+            selectedOrder = null;
+        }
+
+        // Load suppliers for filter
+        loadSuppliers();
+        
+        // Initial load
+        loadOrders();
+        
+        // Auto-refresh every 60 seconds
+        setInterval(loadOrders, 60000);
+    </script>
+</body>
+</html>

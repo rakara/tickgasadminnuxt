@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics - TickGas Admin</title>
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="/css/admin.css">
+    <link rel="icon" type="image/png" href="/icons/favicon.png">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0a0a0a">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    
+    
+    <script src="/js/api.js"></script>
+    <script src="/js/sidebar.js"></script>
+</head>
+<body>
+    <script>if (!requireAuth()) throw new Error("redirect");</script>
+    <script>renderSidebar('analytics');</script>
+    <div class="container">
+
+        <div class="main">
+            <div class="header">
+                <h1>Analytics & Reports</h1>
+                <div class="header-controls">
+                    <button class="refresh-btn" onclick="loadAnalytics()">
+                        <span>↻</span> Refresh
+                    </button>
+                </div>
+            </div>
+
+            <div class="error-message" id="errorMessage">
+                <span>⚠️</span>
+                <span id="errorText"></span>
+            </div>
+
+            <div class="date-range">
+                <button class="range-btn active" onclick="setRange('week')">Last 7 Days</button>
+                <button class="range-btn" onclick="setRange('month')">This Month</button>
+                <button class="range-btn" onclick="setRange('quarter')">Last 3 Months</button>
+                <button class="range-btn" onclick="setRange('year')">This Year</button>
+            </div>
+
+            <div class="kpi-grid" id="kpiGrid">
+                <div class="kpi-card">
+                    <div class="kpi-label">Total Revenue</div>
+                    <div class="kpi-value" id="totalRevenue">KSh 0</div>
+                    <div class="kpi-trend" id="revenueTrend">↑ 0%</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Total Orders</div>
+                    <div class="kpi-value" id="totalOrders">0</div>
+                    <div class="kpi-trend" id="ordersTrend">↑ 0%</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Avg. Order Value</div>
+                    <div class="kpi-value" id="avgOrder">KSh 0</div>
+                    <div class="kpi-trend" id="avgTrend">↑ 0%</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Active Suppliers</div>
+                    <div class="kpi-value" id="activeSuppliers">0</div>
+                    <div class="kpi-trend" id="supplierTrend">↑ 0%</div>
+                </div>
+            </div>
+
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <div class="chart-title">
+                        <span>Revenue Trend</span>
+                        <select id="revenuePeriod" onchange="loadAnalytics()">
+                            <option value="week">Weekly</option>
+                            <option value="month">Monthly</option>
+                            <option value="year">Yearly</option>
+                        </select>
+                    </div>
+                    <div class="chart-container" id="revenueChart"></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">Orders by Status</div>
+                    <div class="status-list" id="orderStatusList"></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">Orders Trend</div>
+                    <div class="chart-container" id="ordersChart"></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">Top Suppliers</div>
+                    <div class="suppliers-list" id="topSuppliers"></div>
+                </div>
+            </div>
+
+            <div class="export-section">
+                <button class="range-btn" onclick="exportReport('pdf')">📄 Export PDF</button>
+                <button class="range-btn" onclick="exportReport('csv')">📊 Export CSV</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentRange = 'week';
+        let currentRevenuePeriod = 'week';
+
+        function setRange(range) {
+            document.querySelectorAll('.range

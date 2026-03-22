@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TickGas Admin</title>
+    <link rel="icon" type="image/png" href="/icons/favicon.png">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0a0a0a">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg0:      #0a0a0a;
+            --bg1:      #141414;
+            --bg2:      #1e1e1e;
+            --border:   rgba(255,255,255,0.07);
+            --text1:    #ffffff;
+            --text2:    #a0a0a0;
+            --text3:    #4a4a4a;
+            --accent:   #ff6b35;
+            --accent2:  #ff9f1c;
+            --success:  #00e87a;
+            --error:    #ff4444;
+            --warning:  #ffaa00;
+            --mono:     'JetBrains Mono', monospace;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg0);
+            color: var(--text1);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ── Layered background ────────────────────────── */
+        .bg-layer {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* Diagonal grid lines — admin feels precise, structured */
+        .bg-grid {
+            background-image:
+                linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+            background-size: 40px 40px;
+            mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 20%, transparent 100%);
+        }
+
+        /* Warm glow pools — matches the orange accent brand */
+        .bg-glow {
+            background:
+                radial-gradient(ellipse 55% 45% at 15% 60%, rgba(255,107,53,0.07) 0%, transparent 65%),
+                radial-gradient(ellipse 40% 40% at 85% 25%, rgba(255,159,28,0.055) 0%, transparent 65%),
+                radial-gradient(ellipse 30% 30% at 50% 90%, rgba(255,107,53,0.04) 0%, transparent 60%);
+            animation: glowDrift 18s ease-in-out infinite alternate;
+        }
+        @keyframes glowDrift {
+            from { transform: scale(1) translate(0, 0); }
+            to   { transform: scale(1.06) translate(1%, -1.5%); }
+        }
+
+        /* ── Scan line — subtle CRT texture for "system" feel ── */
+        .bg-scan {
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0,0,0,0.06) 2px,
+                rgba(0,0,0,0.06) 4px
+            );
+        }
+
+        /* ── Main content ─────────────────────────────── */
+        .stage {
+            position: relative;
+            z-index: 10;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0;
+            padding: 0 24px;
+        }
+
+        /* ── Logo block ───────────────────────────────── */
+        .logo-block {
+            opacity: 0;
+            transform: translateY(12px);
+            animation: riseIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards 0.05s;
+            text-align: center;
+            margin-bottom: 48px;
+        }
+        @keyframes riseIn {
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .logo-mark {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 64px;
+            height: 64px;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            border-radius: 18px;
+            font-size: 30px;
+            margin-bottom: 20px;
+            box-shadow:
+                0 0 0 0 rgba(255,107,53,0.5),
+                0 16px 48px rgba(0,0,0,0.5);
+            animation: brandPulse 2.8s ease-in-out infinite 0.8s;
+            position: relative;
+        }
+        /* Halo ring */
+        .logo-mark::after {
+            content: '';
+            position: absolute;
+            inset: -6px;
+            border-radius: 24px;
+            border: 1px solid rgba(255,107,53,0.2);
+            animation: haloExpand 2.8s ease-in-out infinite 0.8s;
+        }
+        @keyframes brandPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(255,107,53,0.5), 0 16px 48px rgba(0,0,0,0.5); }
+            50%       { box-shadow: 0 0 0 10px rgba(255,107,53,0), 0 16px 48px rgba(0,0,0,0.5); }
+        }
+        @keyframes haloExpand {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50%       { opacity: 0;   transform: scale(1.25); }
+        }
+
+        .logo-name {
+            font-size: 28px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #ffffff 30%, rgba(255,255,255,0.6));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.02em;
+            line-height: 1;
+            margin-bottom: 6px;
+        }
+
+        .logo-role {
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--accent);
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            opacity: 0.9;
+        }
+
+        /* ── Progress panel ───────────────────────────── */
+        .progress-panel {
+            width: 100%;
+            max-width: 340px;
+            opacity: 0;
+            animation: riseIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards 0.18s;
+        }
+
+        /* Track + bar */
+        .track {
+            width: 100%;
+            height: 2px;
+            background: rgba(255,255,255,0.07);
+            border-radius: 100px;
+            overflow: hidden;
+            margin-bottom: 18px;
+            position: relative;
+        }
+        .bar {
+            height: 100%;
+            width: 0%;
+            border-radius: 100px;
+            background: linear-gradient(90deg, var(--accent), var(--accent2));
+            transition: width 0.38s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+        /* Leading shimmer on bar */
+        .bar::after {
+            content: '';
+            position: absolute;
+            right: -1px;
+            top: 0;
+            bottom: 0;
+            width: 20px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5));
+            border-radius: 100px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .bar.running::after { opacity: 1; }
+
+        /* Check list */
+        .checks {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .check-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            opacity: 0;
+            transform: translateX(-6px);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+        .check-item.visible {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .check-icon {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 1.5px solid var(--text3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: 10px;
+            transition: all 0.25s ease;
+            position: relative;
+        }
+        /* Spinning state */
+        .check-icon.spinning {
+            border-color: var(--accent);
+            border-top-color: transparent;
+            animation: checkSpin 0.65s linear infinite;
+        }
+        @keyframes checkSpin { to { transform: rotate(360deg); } }
+
+        /* Done state */
+        .check-icon.done {
+            background: rgba(0,232,122,0.12);
+            border-color: var(--success);
+            color: var(--success);
+            animation: checkPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        @keyframes checkPop {
+            from { transform: scale(0.6); }
+            to   { transform: scale(1); }
+        }
+
+        /* Warn state */
+        .check-icon.warn {
+            background: rgba(255,170,0,0.1);
+            border-color: var(--warning);
+            color: var(--warning);
+        }
+
+        /* Error state */
+        .check-icon.error {
+            background: rgba(255,68,68,0.1);
+            border-color: var(--error);
+            color: var(--error);
+        }
+
+        .check-label {
+            font-size: 13px;
+            color: var(--text2);
+            font-family: var(--mono);
+            flex: 1;
+            transition: color 0.25s;
+        }
+        .check-item.active  .check-label { color: var(--text1); }
+        .check-item.done-row .check-label { color: var(--text2); }
+
+        .check-tag {
+            font-family: var(--mono);
+            font-size: 10px;
+            padding: 2px 7px;
+            border-radius: 4px;
+            font-weight: 500;
+            opacity: 0;
+            transform: scale(0.8);
+            transition: opacity 0.2s, transform 0.2s;
+        }
+        .check-item.done-row  .check-tag,
+        .check-item.warn-row  .check-tag,
+        .check-item.error-row .check-tag { opacity: 1; transform: scale(1); }
+
+        .tag-ok   { background: rgba(0,232,122,0.1);  color: var(--success); }
+        .tag-warn { background: rgba(255,170,0,0.1);  color: var(--warning); }
+        .tag-err  { background: rgba(255,68,68,0.1);  color: var(--error);   }
+        .tag-skip { background: rgba(160,160,160,0.1); color: var(--text2);  }
+
+        /* ── Status line at bottom ────────────────────── */
+        .status-line {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 20;
+            text-align: center;
+            opacity: 0;
+            animation: riseIn 0.4s ease forwards 0.4s;
+        }
+        .status-text {
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--text3);
+            letter-spacing: 0.06em;
+            white-space: nowrap;
+        }
+        .status-text span {
+            color: var(--text2);
+            transition: color 0.3s;
+        }
+
+        /* ── Action buttons (shown after boot completes) ─ */
+        .action-area {
+            width: 100%;
+            max-width: 340px;
+            margin-top: 28px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            opacity: 0;
+            transform: translateY(8px);
+            transition: opacity 0.35s ease, transform 0.35s ease;
+            pointer-events: none;
+        }
+        .action-area.visible {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: all;
+        }
+
+        .btn-enter {
+            width: 100%;
+            padding: 14px 24px;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            border: none;
+            border-radius: 12px;
+            color: #000;
+            font-family: 'Outfit', sans-serif;
+            font-size: 15px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: transform 0.18s, box-shadow 0.18s;
+            box-shadow: 0 8px 28px rgba(255,107,53,0.28);
+        }
+        .btn-enter:hover { transform: translateY(-2px); box-shadow: 0 14px 36px rgba(255,107,53,0.38); }
+        .btn-enter:active { transform: translateY(0); }
+
+        .btn-install {
+            width: 100%;
+            padding: 12px 24px;
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 12px;
+            color: var(--text2);
+            font-family: 'Outfit', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: border-color 0.18s, color 0.18s;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .btn-install.visible { display: flex; }
+        .btn-install:hover { border-color: var(--accent); color: var(--accent); }
+
+        /* ── Redirect flash overlay ───────────────────── */
+        .flash {
+            position: fixed;
+            inset: 0;
+            background: var(--bg0);
+            z-index: 999;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        .flash.show { opacity: 1; pointer-events: all; }
+    </style>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
+      }
+    </script>
+</head>
+<body>
+
+    <!-- Background layers -->
+    <div class="bg-layer bg-glow"></div>
+    <div class="bg-layer bg-grid"></div>
+    <div class="bg-layer bg-scan"></div>
+
+    <!-- Main stage -->
+    <div class="stage">
+
+        <!-- Logo -->
+        <div class="logo-block">
+            <div class="logo-mark">🔥</div>
+            <div class="logo-name">TickGas</div>
+            <div class="logo-role">Admin Console</div>
+        </div>
+
+        <!-- Progress panel -->
+        <div class="progress-panel">
+            <div class="track">
+                <div class="bar" id="bar"></div>
+            </div>
+            <div class="checks" id="checks"></div>
+        </div>
+
+        <!-- Action buttons — revealed after boot -->
+        <div class="action-area" id="actionArea">
+            <button class="btn-enter" id="btnEnter" onclick="navigate()">Enter Admin Console →</button>
+            <button class="btn-install" id="btnInstall" onclick="installApp()">⬇ Install App</button>
+        </div>
+    </div>
+
+    <!-- Bottom status -->
+    <div class="status-line">
+        <div class="status-text">TICKGAS ADMIN &nbsp;·&nbsp; <span id="statusMsg">Initialising…</span></div>
+    </div>
+
+    <!-- Redirect flash -->
+    <div class="flash" id="flash"></div>
+
+    <script>
+    // ═══════════════════════════════════════════════════════
+    //  Check definitions
+    //  Each step: { label, key, run: async fn → 'ok'|'warn'|'skip'|'error' }
+    // ═══════════════════════════════════════════════════════
+    const STEPS = [
+        {
+            label: 'Local storage',
+            key:   'storage',
+            run:   checkStorage
+        },
+        {
+            label: 'Session token',
+            key:   'token',
+            run:   checkToken
+        },
+        {
+            label: 'Token integrity',
+            key:   'jwt',
+            run:   checkJWT
+        },
+        {
+            label: 'Network reachability',
+            key:   'network',
+            run:   checkNetwork
+        },
+        {
+            label: 'API health',
+            key:   'api',
+            run:   checkAPI
+        },
+        {
+            label: 'Session permissions',
+            key:   'perms',
+            run:   checkPerms
+        },
+    ];
+
+    // ── Checks ────────────────────────────────────────────
+    async function checkStorage() {
+        try {
+            localStorage.setItem('__tg_probe', '1');
+            localStorage.removeItem('__tg_probe');
+            return 'ok';
+        } catch (e) {
+            return 'error'; // Private mode / quota
+        }
+    }
+
+    async function checkToken() {
+        const t = localStorage.getItem('adminToken');
+        if (!t) return 'warn'; // No token → will redirect to login
+        return 'ok';
+    }
+
+    async function checkJWT() {
+        const t = localStorage.getItem('adminToken');
+        if (!t) return 'skip';
+        try {
+            const parts = t.split('.');
+            if (parts.length !== 3) return 'error';
+            const payload = JSON.parse(atob(parts[1].replace(/-/g,'+').replace(/_/g,'/')));
+            if (payload.role !== 'admin') return 'error';
+            if (payload.exp && payload.exp * 1000 < Date.now()) {
+                // Expired — clear it
+                localStorage.removeItem('adminToken');
+                localStorage.removeItem('admin');
+                return 'warn';
+            }
+            return 'ok';
+        } catch (e) {
+            localStorage.removeItem('adminToken');
+            localStorage.removeItem('admin');
+            return 'error';
+        }
+    }
+
+    async function checkNetwork() {
+        if (!navigator.onLine) return 'warn';
+        return 'ok';
+    }
+
+    async function checkAPI() {
+        const t = localStorage.getItem('adminToken');
+        if (!t) return 'skip';
+        try {
+            const ctrl = new AbortController();
+            const tid  = setTimeout(() => ctrl.abort(), 4000);
+            const r = await fetch('/api/admin/dashboard', {
+                method: 'GET',
+                headers: { Authorization: 'Bearer ' + t },
+                signal: ctrl.signal
+            });
+            clearTimeout(tid);
+            if (r.status === 401) return 'warn'; // Token rejected server-side
+            if (r.ok) return 'ok';
+            return 'warn';
+        } catch (e) {
+            return 'warn'; // Offline or server down — still let them try
+        }
+    }
+
+    async function checkPerms() {
+        const t = localStorage.getItem('adminToken');
+        if (!t) return 'skip';
+        try {
+            const parts   = t.split('.');
+            const payload = JSON.parse(atob(parts[1].replace(/-/g,'+').replace(/_/g,'/')));
+            return payload.role === 'admin' ? 'ok' : 'error';
+        } catch (e) {
+            return 'error';
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  UI helpers
+    // ═══════════════════════════════════════════════════════
+    const TAG_MAP = {
+        ok:    { cls: 'tag-ok',   txt: 'OK'   },
+        warn:  { cls: 'tag-warn', txt: 'WARN' },
+        skip:  { cls: 'tag-skip', txt: 'SKIP' },
+        error: { cls: 'tag-err',  txt: 'FAIL' },
+    };
+    const ICON_MAP = {
+        ok:    { cls: 'done',  sym: '✓' },
+        warn:  { cls: 'warn',  sym: '!' },
+        skip:  { cls: 'done',  sym: '–' },
+        error: { cls: 'error', sym: '✕' },
+    };
+
+    function buildRows() {
+        const container = document.getElementById('checks');
+        STEPS.forEach((step, i) => {
+            const row = document.createElement('div');
+            row.className = 'check-item';
+            row.id = `row-${i}`;
+            row.innerHTML = `
+                <div class="check-icon" id="icon-${i}"></div>
+                <div class="check-label" id="label-${i}">${step.label}</div>
+                <div class="check-tag"  id="tag-${i}"></div>`;
+            container.appendChild(row);
+        });
+    }
+
+    function showRow(i) {
+        const row = document.getElementById(`row-${i}`);
+        row.classList.add('visible', 'active');
+        document.getElementById(`icon-${i}`).classList.add('spinning');
+    }
+
+    function resolveRow(i, result) {
+        const row  = document.getElementById(`row-${i}`);
+        const icon = document.getElementById(`icon-${i}`);
+        const tag  = document.getElementById(`tag-${i}`);
+        const { cls: rowCls } = TAG_MAP[result];
+        const { cls: iconCls, sym } = ICON_MAP[result];
+
+        row.classList.remove('active');
+        row.classList.add(result === 'ok' || result === 'skip' ? 'done-row' : `${result}-row`);
+
+        icon.classList.remove('spinning');
+        icon.classList.add(iconCls);
+        icon.textContent = sym;
+
+        tag.className = `check-tag ${rowCls}`;
+        tag.textContent = TAG_MAP[result].txt;
+    }
+
+    function setBar(pct) {
+        const bar = document.getElementById('bar');
+        bar.style.width = pct + '%';
+        bar.classList.toggle('running', pct < 100);
+    }
+
+    function setStatus(msg) {
+        document.getElementById('statusMsg').textContent = msg;
+    }
+
+    function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    // ═══════════════════════════════════════════════════════
+    //  PWA install prompt
+    // ═══════════════════════════════════════════════════════
+    let _installPrompt = null;
+
+    window.addEventListener('beforeinstallprompt', e => {
+        e.preventDefault();
+        _installPrompt = e;
+        // Show the install button if boot has already finished
+        document.getElementById('btnInstall').classList.add('visible');
+    });
+
+    window.addEventListener('appinstalled', () => {
+        _installPrompt = null;
+        document.getElementById('btnInstall').classList.remove('visible');
+        setStatus('App installed ✓');
+    });
+
+    async function installApp() {
+        if (!_installPrompt) return;
+        _installPrompt.prompt();
+        const { outcome } = await _installPrompt.userChoice;
+        if (outcome === 'accepted') {
+            _installPrompt = null;
+            document.getElementById('btnInstall').classList.remove('visible');
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  Navigation — called by the Enter button
+    // ═══════════════════════════════════════════════════════
+    let _dest = '/login.html';
+
+    function navigate() {
+        document.getElementById('flash').classList.add('show');
+        setTimeout(() => window.location.replace(_dest), 310);
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  Boot sequence
+    // ═══════════════════════════════════════════════════════
+    async function boot() {
+        buildRows();
+        await delay(180);
+
+        let hasToken    = false;
+        let tokenValid  = false;
+        let hardFailure = false;
+
+        const stepPct = 100 / STEPS.length;
+
+        for (let i = 0; i < STEPS.length; i++) {
+            const step = STEPS[i];
+
+            showRow(i);
+            setStatus(step.label + '…');
+            setBar(Math.round(i * stepPct));
+
+            const [result] = await Promise.all([
+                step.run(),
+                delay(i === 0 ? 160 : 280)
+            ]);
+
+            resolveRow(i, result);
+
+            if (step.key === 'token' && result === 'ok')  hasToken   = true;
+            if (step.key === 'jwt'   && result === 'ok')  tokenValid = true;
+            if (result === 'error' && step.key === 'storage') hardFailure = true;
+        }
+
+        setBar(100);
+        await delay(260);
+
+        // ── Decision ──────────────────────────────────────
+        if (hardFailure) {
+            setStatus('Storage unavailable — cannot continue');
+            return;
+        }
+
+        const authed = hasToken && tokenValid;
+        _dest = authed ? '/dashboard.html' : '/login.html';
+
+        // Never auto-redirect — always present a button so the user
+        // explicitly enters the app. Install prompt shown if available.
+        setStatus(authed ? 'Session active. Ready.' : 'System ready.');
+        document.getElementById('btnEnter').textContent =
+            authed ? 'Go to Dashboard →' : 'Go to Login →';
+        if (_installPrompt) {
+            document.getElementById('btnInstall').classList.add('visible');
+        }
+        document.getElementById('actionArea').classList.add('visible');
+    }
+
+    boot();
+    </script>
+</body>
+</html>

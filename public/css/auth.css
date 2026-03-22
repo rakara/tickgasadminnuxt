@@ -1,0 +1,86 @@
+/* ═══════════════════════════════════════════════════════
+   TickGas — auth.css
+   Login and registration pages (admin + supplier).
+   ═══════════════════════════════════════════════════════ */
+
+body.auth-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px 20px;
+}
+
+/* Ambient glow for auth pages */
+body.auth-page::before {
+  content: '';
+  position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background:
+    radial-gradient(ellipse 55% 45% at 20% 55%, rgba(255,107,53,.07) 0%, transparent 65%),
+    radial-gradient(ellipse 45% 35% at 80% 20%, rgba(255,159,28,.06) 0%, transparent 65%);
+}
+
+/* ── Auth card ───────────────────────────────────────── */
+.auth-container {
+  width: 100%; max-width: 420px;
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-2xl);
+  padding: 36px 32px;
+  position: relative; z-index: 1;
+  box-shadow: 0 24px 80px rgba(0,0,0,.5);
+}
+
+.auth-logo {
+  display: block;
+  font-size: 30px; font-weight: 800;
+  text-align: center;
+  background: var(--gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 6px;
+}
+.auth-subtitle {
+  text-align: center;
+  font-size: 14px;
+  color: var(--text2);
+  margin-bottom: 28px;
+}
+
+/* ── Tab switcher ────────────────────────────────────── */
+.auth-tabs {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 6px; margin-bottom: 24px;
+  background: var(--bg2); border-radius: var(--r-md); padding: 5px;
+}
+.auth-tab {
+  padding: 10px; border: none; border-radius: calc(var(--r-md) - 2px);
+  background: transparent; color: var(--text2);
+  font-size: 14px; font-weight: 600; cursor: pointer;
+  transition: all .2s;
+}
+.auth-tab.active { background: var(--gradient); color: #000; }
+
+/* ── Auth inputs (override main.css base for larger size) ── */
+.auth-input {
+  width: 100%; padding: 14px 16px;
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--r-md); color: var(--text1);
+  font-size: 15px; outline: none;
+  transition: border-color .18s, box-shadow .18s;
+}
+.auth-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(255,107,53,.1);
+}
+.auth-input::placeholder { color: var(--text3); }
+
+/* ── Footer ──────────────────────────────────────────── */
+.auth-footer {
+  text-align: center;
+  color: var(--text2); font-size: 13px;
+  margin-top: 20px;
+}
+.auth-footer a { color: var(--accent); }
+.auth-footer a:hover { text-decoration: underline; }

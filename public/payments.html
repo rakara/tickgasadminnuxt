@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payments - TickGas Admin</title>
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="/css/admin.css">
+    <link rel="icon" type="image/png" href="/icons/favicon.png">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0a0a0a">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    
+    
+    <script src="/js/api.js"></script>
+    <script src="/js/sidebar.js"></script>
+</head>
+<body>
+    <script>if (!requireAuth()) throw new Error("redirect");</script>
+    <script>renderSidebar('payments');</script>
+    <div class="container">
+        <!-- Sidebar -->
+
+        <div class="main">
+            <div class="header">
+                <h1>Payment Transactions</h1>
+                <div class="header-controls">
+                    <button class="refresh-btn" onclick="loadTransactions()">
+                        <span>↻</span> Refresh
+                    </button>
+                </div>
+            </div>
+
+            <div class="summary-cards">
+                <div class="summary-card">
+                    <div class="summary-label">Total Revenue</div>
+                    <div class="summary-value" id="totalRevenue">KSh 0</div>
+                    <div class="summary-sub">All time</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">This Month</div>
+                    <div class="summary-value" id="monthlyRevenue">KSh 0</div>
+                    <div class="summary-sub" id="monthLabel"></div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">Commission (5%)</div>
+                    <div class="summary-value" id="commission">KSh 0</div>
+                    <div class="summary-sub">Platform fees</div>
+                </div>
+            </div>
+
+            <div class="filters">
+                <select class="filter-select" id="statusFilter" onchange="loadTransactions()">
+                    <option value="">All Status</option>
+                    <option value="completed">Completed</option>
+                    <option value="pending">Pending</option>
+                    <option value="failed">Failed</option>
+                </select>
+                <input type="date" class="date-input" id="startDate" onchange="loadTransactions()">
+                <input type="date" class="date-input" id="endDate" onchange="loadTransactions()">
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Order ID</th>
+                            <th>Customer</th>
+                            <th>Supplier</th>
+                            <th>Amount</th>
+                            <th>Commission</th>
+                            <th>Status</th>
+                            <th>Receipt</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transactionsBody">
+                        <tr>
+                            <td colspan="8" class="loading">
+                                <div class="loading-spinner"></div>
+                                Loading transactions...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="pagination" id="pagination"></div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        let currentPage = 1;
+        let totalPages = 1;
+        let totalRecords = 0;
+        const limit = 15;
+
+        document.getElementById('monthLabel').textContent = new Date().toLocaleDateString('en-US', { 
+            month: 'long', year: 'numeric' 
+        });
+
+        async function loadTransactions() {
+            const status = document.getElementById('statusFilter').value;
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+
+            try {
+                const response = await authFetch(
+                    `/api/admin/payments?status=${status}&startDate=${startDate}&endDate=${endDate}&page=${currentPage}&limit=${limit}`
+                );
+                
+                const data = await response.json();
+                console.log('📦 Payments data:', data);
+                
+                if (data.transactions) {
+                    renderTransactions(data.transactions);
+                    updateSummary(data.summary);
+                    renderPagination(data.total);
+                }
+            } catch (error) {
+                console.error('Error loading transactions:', error);
+            }
+        }
+
+        function renderTransactions(transactions) {
+            const tbody = document.getElementById('transactionsBody');
+            
+            if (!transactions || transactions.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><div class="empty-icon">💰</div>No transactions found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = transactions.map(t => {
+                // Safely access nested properties
+                const orderNumber = t.orders?.order_number || 'N/A';
+                const customerName = t.orders?.users?.name || 'N/A';
+                const supplierName = t.orders?.suppliers?.name || 'N/A';
+                const amount = t.amount || 0;
+                const commission = amount * 0.05;
+                
+                return `
+                <tr>
+                    <td>${new Date(t.created_at).toLocaleDateString()}</td>
+                    <td>#${orderNumber}</td>
+                    <td>${customerName}</td>
+                    <td>${supplierName}</td>
+                    <td>KSh ${amount.toLocaleString()}</td>
+                    <td>KSh ${commission.toLocaleString()}</td>
+                    <td><span class="status-badge status-${t.status || 'pending'}">${t.status || 'pending'}</span></td>
+                    <td><span class="receipt-number">${t.mpesa_receipt_number || 'N/A'}</span></td>
+                </tr>
+            `}).join('');
+        }
+
+        function updateSummary(summary) {
+            document.getElementById('totalRevenue').textContent = `KSh ${(summary?.totalRevenue || 0).toLocaleString()}`;
+            document.getElementById('monthlyRevenue').textContent = `KSh ${(summary?.monthlyRevenue || 0).toLocaleString()}`;
+            document.getElementById('commission').textContent = `KSh ${(summary?.commission || 0).toLocaleString()}`;
+        }
+
+        function renderPagination(total) {
+            totalRecords = total;
+            totalPages = Math.ceil(total / limit);
+            const pagination = document.getElementById('pagination');
+            
+            if (totalPages <= 1) {
+                pagination.innerHTML = '';
+                return;
+            }
+            
+            let html = '';
+            html += `<button class="page-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="changePage(${currentPage - 1})">←</button>`;
+            
+            for (let i = 1; i <= totalPages; i++) {
+                if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
+                    html += `<button class="page-btn ${i === currentPage ? 'active' : ''}" onclick="changePage(${i})">${i}</button>`;
+                } else if (i === currentPage - 3 || i === currentPage + 3) {
+                    html += `<span class="page-btn" style="background:transparent; border:none;">...</span>`;
+                }
+            }
+            
+            html += `<button class="page-btn" ${currentPage === totalPages ? 'disabled' : ''} onclick="changePage(${currentPage + 1})">→</button>`;
+            html += `<span class="page-info">Page ${currentPage} of ${totalPages} (${totalRecords} records)</span>`;
+            
+            pagination.innerHTML = html;
+        }
+
+        function changePage(page) {
+            if (page < 1 || page > totalPages) return;
+            currentPage = page;
+            loadTransactions();
+        }
+
+        // Initial load
+        loadTransactions();
+        setInterval(loadTransactions, 60000);
+    </script>
+</body>
+</html>
