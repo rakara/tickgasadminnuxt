@@ -182,3 +182,26 @@ ion-content {
   padding: 16px 0 0;
 }
 .pagination-info { font-size: 13px; color: var(--text2); }
+
+/* ── Nuxt + Ionic page shell integration ─────────────────────────────────────
+   .main-content (in pages/app.vue) wraps NuxtPage.
+   IonPage uses position:absolute + inset:0, so the parent must be
+   position:relative and have an explicit height for it to fill correctly.
+   ─────────────────────────────────────────────────────────────────────────── */
+.main-content {
+  position: relative;
+  height: 100vh;
+}
+
+/* On mobile the sidebar is hidden so full width is used */
+@media (max-width: 900px) {
+  .main-content {
+    height: 100dvh;
+  }
+}
+
+/* Ensure IonPage fills its container */
+ion-page {
+  --offset-top: 0px;
+  --offset-bottom: 0px;
+}
