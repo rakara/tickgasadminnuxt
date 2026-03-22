@@ -1,0 +1,70 @@
+:root {
+  /* ── TickGas brand palette ─────────────────────────── */
+  --bg0:      #0a0a0a;
+  --bg1:      #141414;
+  --bg2:      #1e1e1e;
+  --bg3:      #262626;
+  --border:   rgba(255, 255, 255, 0.07);
+  --text1:    #ffffff;
+  --text2:    #a0a0a0;
+  --text3:    #4a4a4a;
+  --accent:   #ff6b35;
+  --accent2:  #ff9f1c;
+  --success:  #00e87a;
+  --error:    #ff4444;
+  --warning:  #ffaa00;
+  --info:     #4da6ff;
+  --mono:     'JetBrains Mono', monospace;
+
+  /* ── Ionic overrides ───────────────────────────────── */
+  --ion-background-color:             var(--bg0);
+  --ion-background-color-rgb:         10, 10, 10;
+  --ion-text-color:                   var(--text1);
+  --ion-text-color-rgb:               255, 255, 255;
+
+  --ion-color-primary:                var(--accent);
+  --ion-color-primary-rgb:            255, 107, 53;
+  --ion-color-primary-contrast:       #ffffff;
+  --ion-color-primary-shade:          #e05f2e;
+  --ion-color-primary-tint:           #ff7a49;
+
+  --ion-color-secondary:              var(--accent2);
+  --ion-color-secondary-rgb:          255, 159, 28;
+  --ion-color-secondary-contrast:     #000000;
+  --ion-color-secondary-shade:        #e08c18;
+  --ion-color-secondary-tint:         #ffa932;
+
+  --ion-color-success:                var(--success);
+  --ion-color-success-rgb:            0, 232, 122;
+  --ion-color-success-contrast:       #000000;
+
+  --ion-color-warning:                var(--warning);
+  --ion-color-warning-rgb:            255, 170, 0;
+  --ion-color-warning-contrast:       #000000;
+
+  --ion-color-danger:                 var(--error);
+  --ion-color-danger-rgb:             255, 68, 68;
+  --ion-color-danger-contrast:        #ffffff;
+
+  --ion-toolbar-background:           var(--bg1);
+  --ion-toolbar-color:                var(--text1);
+  --ion-toolbar-border-color:         var(--border);
+
+  --ion-tab-bar-background:           var(--bg1);
+  --ion-tab-bar-border-color:         var(--border);
+  --ion-tab-bar-color:                var(--text3);
+  --ion-tab-bar-color-selected:       var(--accent);
+
+  --ion-item-background:              transparent;
+  --ion-item-border-color:            var(--border);
+
+  --ion-card-background:              var(--bg1);
+
+  --ion-input-background:             var(--bg2);
+  --ion-input-color:                  var(--text1);
+
+  --ion-font-family:                  'Outfit', sans-serif;
+
+  --ion-safe-area-top:                env(safe-area-inset-top);
+  --ion-safe-area-bottom:             env(safe-area-inset-bottom);
+}

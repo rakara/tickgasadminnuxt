@@ -1,66 +1,129 @@
-# TickGas — Admin Web App
+# TickGas Admin — Nuxt 3 + Ionic Vue + Vercel
 
-Internal web application for TickGas platform administrators.
+Single-repo admin dashboard. The Vue frontend and the API backend live together — no CORS, no second server, one deployment.
 
-## Live URL
-`https://admin.tickgas.com`
+## Stack
 
-## What's in this repo
-| Path | Purpose |
-|---|---|
-| `pages/api/admin/login.js` | Email + password auth → JWT (role=admin) |
-| `pages/api/admin/dashboard.js` | Platform KPIs + revenue chart data |
-| `pages/api/admin/analytics.js` | Aggregate analytics endpoint |
-| `pages/api/admin/suppliers.js` | List + approve/reject/suspend suppliers |
-| `pages/api/admin/orders.js` | Platform-wide order management |
-| `pages/api/admin/orders/[id].js` | Single order detail |
-| `pages/api/admin/payments.js` | M-PESA transaction history |
-| `pages/api/admin/agents.js` | Create + manage field agents |
-| `pages/api/admin/locations.js` | Service area management |
-| `pages/api/admin/locations/[id].js` | Single location CRUD |
-| `public/login.html` | Admin login |
-| `public/dashboard.html` | KPI overview |
-| `public/suppliers.html` | Supplier approval queue |
-| `public/orders.html` | Order list |
-| `public/payments.html` | Payment transactions |
-| `public/analytics.html` | Charts and metrics |
-| `public/agents.html` | Agent management |
-| `public/locations.html` | Service area management |
-| `lib/daraja.js` | M-PESA client (admin-initiated retries) |
+| Layer       | Technology                                      |
+|-------------|-------------------------------------------------|
+| Framework   | Nuxt 3 (SPA mode, SSR disabled)                 |
+| UI          | Ionic Vue 8 (MD mode)                           |
+| API routes  | Nitro `server/api/` → Vercel serverless functions |
+| Database    | Supabase (PostgreSQL, service-role server-side) |
+| Auth        | Custom JWT (bcrypt + jsonwebtoken)              |
+| Deployment  | Vercel (`nitro.preset = 'vercel'`)              |
 
-## Setup
+## Why Nuxt 3 over plain Vite
+
+- `server/api/*.ts` files become Vercel serverless functions automatically — no `vercel.json` route config needed
+- `useRuntimeConfig()` separates secret server keys from public client keys cleanly
+- `useLazyAsyncData` / `$fetch` replace raw `fetch` — built-in error handling, deduplication, and SSR-safe patterns
+- `composables/` and `server/utils/` are auto-imported everywhere — zero import boilerplate
+
+## Project layout
+
+```
+tickgas-admin-nuxt/
+├── nuxt.config.ts          — SPA mode, Vercel preset, CSS, runtimeConfig
+├── app.vue                 — <ion-app> root + client-side auth guard
+├── plugins/
+│   └── ionic.client.ts     — registers IonicVue + ionicons (client only)
+├── composables/
+│   ├── useAuth.ts          — reactive session state (token, admin, save/clear)
+│   └── useApi.ts           — $fetch wrapper with JWT injection + formatters
+├── assets/css/
+│   ├── variables.css       — TickGas brand tokens + Ionic CSS var overrides
+│   └── global.css          — stat cards, badges, shared layout styles
+├── pages/
+│   ├── index.vue           — redirects to /app/dashboard or /login
+│   ├── login.vue           — login page
+│   ├── app.vue             — Ionic tab bar shell
+│   └── app/
+│       ├── dashboard.vue
+│       ├── orders.vue
+│       ├── suppliers.vue
+│       ├── agents.vue
+│       ├── payments.vue
+│       ├── more.vue
+│       ├── analytics.vue
+│       ├── locations.vue
+│       └── profile.vue
+└── server/
+    ├── utils/
+    │   ├── supabase.ts     — useSupabaseAdmin() (auto-imported by Nitro)
+    │   ├── auth.ts         — signToken, verifyToken, requireAdmin (auto-imported)
+    │   └── phone.ts        — normalisePhone (auto-imported)
+    └── api/admin/
+        ├── login.post.ts
+        ├── dashboard.get.ts
+        ├── orders.get.ts
+        ├── orders.put.ts
+        ├── suppliers.get.ts
+        ├── suppliers.post.ts
+        ├── suppliers.put.ts
+        ├── agents.get.ts
+        ├── agents.post.ts
+        ├── agents.put.ts
+        ├── payments.get.ts
+        ├── analytics.get.ts
+        ├── locations.get.ts
+        ├── locations.post.ts
+        └── locations/
+            └── [id].patch.ts
+```
+
+## Getting started
 
 ```bash
-cp .env.example .env.local
-# Fill in all values — especially ADMIN_EMAIL + ADMIN_PASSWORD_HASH for first login
+# 1. Install
 npm install
+
+# 2. Configure
+cp .env.example .env
+# Fill in all NUXT_* variables
+
+# 3. Dev server (frontend + API on the same port)
 npm run dev
+
+# 4. Build
+npm run build
+
+# 5. Preview production build locally
+npm run preview
 ```
 
-## First admin login
-Until the `admins` DB table is seeded, the app falls back to env-var credentials:
+## Environment variables
+
+Set these in Vercel → Project → Settings → Environment Variables:
+
+| Variable                    | Where used  | Description                        |
+|-----------------------------|-------------|------------------------------------|
+| `NUXT_JWT_SECRET`           | Server only | JWT signing secret (min 32 chars)  |
+| `NUXT_SUPABASE_SERVICE_KEY` | Server only | Supabase service-role key (bypasses RLS) |
+| `NUXT_ADMIN_EMAIL`          | Server only | Bootstrap admin email              |
+| `NUXT_ADMIN_PASSWORD_HASH`  | Server only | bcrypt hash of bootstrap password  |
+| `NUXT_PUBLIC_SUPABASE_URL`  | Public      | Supabase project URL               |
+| `NUXT_PUBLIC_SUPABASE_ANON_KEY` | Public  | Supabase anon key                  |
+
+## Deploying to Vercel
+
 ```bash
-# Generate a bcrypt hash of your chosen password:
-node -e "const b=require('bcryptjs'); b.hash('YourPassword',12).then(h=>console.log(h))"
-
-# Add to .env.local:
-ADMIN_EMAIL=admin@tickgas.com
-ADMIN_PASSWORD_HASH=<hash from above>
+# Push to GitHub, then in Vercel:
+# 1. Import repo
+# 2. Framework preset: Nuxt.js (auto-detected)
+# 3. Add all NUXT_* env vars
+# 4. Deploy
 ```
-After that, create a proper row in the `admins` table and remove the env-var fallback.
 
-## Environment Variables
-See `.env.example`. Key ones:
-- `JWT_SECRET` — **must be identical across all four apps**
-- `NEXT_PUBLIC_SUPABASE_URL` + keys — same Supabase project
-- `ADMIN_EMAIL` + `ADMIN_PASSWORD_HASH` — bootstrap credentials (first login only)
+Nitro's Vercel preset handles everything — each `server/api/*.ts` file becomes an independent serverless function. No `vercel.json` needed.
 
-## Deploy to Vercel
+## Capacitor (optional native wrapper)
+
 ```bash
-vercel --prod
+npm install --save-dev @capacitor/core @capacitor/cli @capacitor/android @capacitor/ios
+npx cap init "TickGas Admin" com.tickgas.admin --web-dir=.output/public
+npm run build
+npx cap add android
+npx cap sync
+npx cap open android
 ```
-
-## Notes
-- This is intentionally **not** a PWA — it's a desktop-first admin tool.
-- All API routes require a valid `role=admin` JWT.
-- Approving a supplier auto-sets `verified=true` and fires an SMS notification.
